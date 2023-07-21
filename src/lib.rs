@@ -10,6 +10,7 @@ use moss_protocol::MossWord;
 #[pymodule]
 fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
 
     m.add_class::<MossHit>()?;
     m.add_class::<MossPacket>()?;
@@ -86,8 +87,22 @@ fn decode_event(bytes: Vec<u8>) -> PyResult<(MossPacket, Vec<u8>)> {
     Ok((packet, unprocessed.to_vec()))
 }
 
-// #[pyfunction]
-// fn decode_multiple_events(bytes: Vec<u8>) -> PyResult<Vec<MossPacket>> {}
+/// Decodes multiple MOSS events into a list of [MossPacket]s
+#[pyfunction]
+fn decode_multiple_events(mut bytes: Vec<u8>) -> PyResult<Vec<MossPacket>> {
+    let mut moss_packets: Vec<MossPacket> = Vec::new();
+
+    while let Ok((packet, unprocessed_data)) = decode_event(bytes) {
+        moss_packets.push(packet);
+        bytes = unprocessed_data;
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyTypeError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok(moss_packets)
+    }
+}
 
 #[cfg(test)]
 mod tests {
