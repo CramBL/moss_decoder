@@ -72,8 +72,6 @@ fn decode_event(bytes: Vec<u8>) -> PyResult<(MossPacket, Vec<u8>)> {
                 }
                 MossWord::Delimiter => {
                     debug_assert!(!is_moss_packet);
-                    processed_bytes_idx = i + 1;
-                    break;
                 }
             }
         }
