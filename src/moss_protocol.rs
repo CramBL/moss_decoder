@@ -1,7 +1,7 @@
-pub mod moss_packet;
 pub mod moss_hit;
-pub use moss_packet::MossPacket;
+pub mod moss_packet;
 pub use moss_hit::MossHit;
+pub use moss_packet::MossPacket;
 
 pub(crate) enum MossWord {
     Idle,
@@ -41,7 +41,3 @@ impl MossWord {
         }
     }
 }
-
-
-
-

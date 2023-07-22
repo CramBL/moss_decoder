@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
-use std::fmt::Display;
 use std::fmt::write;
+use std::fmt::Display;
 
 #[pyclass(get_all)]
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
@@ -50,4 +50,5 @@ mod tests {
 
         println!("{moss_hit}");
         println!("{str}", str = moss_hit.__str__().unwrap());
-    }}
+    }
+}

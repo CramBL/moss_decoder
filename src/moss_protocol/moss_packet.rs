@@ -39,7 +39,6 @@ impl Display for MossPacket {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
