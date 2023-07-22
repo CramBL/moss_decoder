@@ -1,6 +1,7 @@
 # MOSS Decoder
 [![CI](https://github.com/CramBL/moss_decoder/actions/workflows/CI.yml/badge.svg)](https://github.com/CramBL/moss_decoder/actions/workflows/CI.yml)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/moss-decoder)
+![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/crambl/moss_decoder)
 
 
 Python module implemented in Rust for decoding raw data from the MOSS chip (Stitched Monolithic Pixel Sensor prototype).
