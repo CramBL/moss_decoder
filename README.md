@@ -5,8 +5,16 @@
 
 
 Python module implemented in Rust for decoding raw data from the MOSS chip (Stitched Monolithic Pixel Sensor prototype).
-
-### Motivation & Purpose
+## Installation
+```shell
+$ pip install moss-decoder
+```
+Import in python and use for decoding raw data.
+```python
+import moss_decoder
+moss_packets = moss_decoder.decode_event(bytes)
+```
+## Motivation & Purpose
 Decoding in native Python is slow and the MOSS verification team at CERN got to a point where we needed more performance.
 
 Earliest version of a Rust package gave massive improvements as shown in the benchmark below.
