@@ -103,6 +103,8 @@ fn decode_multiple_events(mut bytes: Vec<u8>) -> PyResult<Vec<MossPacket>> {
     }
 }
 
+const MIN_PREALLOC: usize = 10;
+
 /// Decodes multiple MOSS events into a list of [MossPacket]s
 #[pyfunction]
 fn decode_multiple_events_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
@@ -114,12 +116,17 @@ fn decode_multiple_events_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
         ));
     }
 
-    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(byte_cnt / 1024);
+    let approx_moss_packets = if byte_cnt / 1024 > MIN_PREALLOC {
+        byte_cnt / 1024
+    } else {
+        MIN_PREALLOC
+    };
+
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
 
     let mut last_trailer_idx = 0;
 
     let mut is_moss_packet = false;
-    //let mut current_unit_id = 0xff; // placeholder
     let mut current_region: u8 = 0xff; // placeholder
 
     for (i, byte) in bytes.iter().enumerate() {
