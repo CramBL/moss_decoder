@@ -39,3 +39,15 @@ impl Display for MossHit {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn print_moss_hit() {
+        let moss_hit = MossHit::default();
+
+        println!("{moss_hit}");
+        println!("{str}", str = moss_hit.__str__().unwrap());
+    }}
