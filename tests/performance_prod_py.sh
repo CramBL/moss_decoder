@@ -7,7 +7,18 @@ readonly CMD="python ${SCRIPT_PATH}"
 
 python -V
 
-pip install moss-decoder --upgrade
+# Make virtual environment
+python -m venv .venv
+# Activate it
+source .venv/bin/activate
+# Show installed packages
+python -m pip freeze
+
+# Install most recent published version
+python -m pip install moss-decoder --upgrade
+
+# Show installed packages
+python -m pip freeze
 
 cargo install hyperfine --locked
 
@@ -17,4 +28,4 @@ hyperfine \
     --style full\
     --time-unit millisecond\
     --shell=bash\
-    --export-markdown bench.md
+    --export-markdown prod-bench.md
