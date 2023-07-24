@@ -30,7 +30,7 @@ use moss_protocol::MossWord;
 #[pymodule]
 fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event, m)?)?;
-    m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
+
     m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
 
     m.add_class::<MossHit>()?;
@@ -38,9 +38,6 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
 
     Ok(())
 }
-
-const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
-/// Decodes a single MOSS event into a [MossPacket]
 
 const MIN_PREALLOC: usize = 10;
 
@@ -77,6 +74,8 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
     }
 }
 
+const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
+/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte
 #[pyfunction]
 pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     let byte_cnt = bytes.len();
@@ -87,15 +86,26 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
         ));
     }
 
+    let (moss_packet, trailer_idx) = if let Ok((moss_packet, trailer_idx)) = raw_decode_event(bytes)
+    {
+        (moss_packet, trailer_idx)
+    } else {
+        return Err(PyTypeError::new_err("No MOSS Packets in event"));
+    };
+
+    Ok((moss_packet, trailer_idx))
+}
+
+fn raw_decode_event(bytes: &[u8]) -> Result<(MossPacket, usize), ()> {
     let mut moss_packet = MossPacket {
         unit_id: INVALID_NO_HEADER_SEEN, // placeholder
         hits: Vec::new(),
     };
 
     let mut trailer_idx = 0;
-    let mut is_moss_packet = false;
     let mut current_region: u8 = 0xff; // placeholder
 
+    let mut is_moss_packet = false;
     for (i, byte) in bytes.iter().enumerate() {
         match MossWord::from_byte(*byte) {
             MossWord::Idle => (),
@@ -147,7 +157,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
         }
     }
     if moss_packet.unit_id == INVALID_NO_HEADER_SEEN {
-        Err(PyTypeError::new_err("No MOSS Packets in event"))
+        Err(())
     } else {
         Ok((moss_packet, trailer_idx))
     }
