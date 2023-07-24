@@ -42,6 +42,7 @@ impl Display for MossPacket {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_moss_packets_iter() {
@@ -51,6 +52,10 @@ mod tests {
             MossPacket::new(2),
         ];
 
-        packets.into_iter().for_each(|p| println!("{p}"));
+        packets.into_iter().enumerate().for_each(|(i, p)| {
+            println!("{p}");
+
+            assert_eq!(p.unit_id, i as u8);
+        });
     }
 }
