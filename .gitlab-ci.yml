@@ -1,0 +1,33 @@
+variables:
+    DOCKER_REGISTRY: "gitlab-registry.cern.ch/alice-its3-wp3/moss-testing/docker"
+
+stages:
+    - build
+
+
+before_script:
+  - hostname -I
+  - whoami
+  - pwd
+  - which python
+  - python --version
+  - echo $PATH
+
+
+
+build:
+    image: ${DOCKER_REGISTRY}/fpga-lint
+    script:
+        - pip install maturin
+        - maturin build
+    artifacts:
+        name: "${CI_COMMIT_SHA}"
+        paths:
+        - $CI_PROJECT_DIR/target/
+
+    rules:
+        - if: $CI_PIPELINE_SOURCE == "push"
+          when: manual
+
+
+
