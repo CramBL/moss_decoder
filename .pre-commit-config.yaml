@@ -1,0 +1,29 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.1.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+-   repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.1.13
+    hooks:
+    -   id: remove-tabs
+        exclude: Makefile
+    -   id: remove-crlf
+-   repo: https://github.com/psf/black
+    rev: 22.3.0
+    hooks:
+    -   id: black
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v1.2.3
+    hooks:
+    - id: flake8
+-   repo: local
+    hooks:
+    -   id: pylint
+        name: pylint
+        entry: pylint --extension-pkg-allow-list=moss_decoder
+        language: python
+        types: [python]
+        additional_dependencies: [pylint, moss_decoder]
+        require_serial: true
