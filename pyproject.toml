@@ -4,11 +4,21 @@ build-backend = "maturin"
 
 [project]
 name = "moss_decoder"
+description = "Python package implemented in Rust to decode MOSS readout data"
+readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+]
+authors = [
+  {email = "marc.beck.konig@cern.ch"},
+  {name = "Marc Beck König"}
+]
+
+maintainers = [
+  { name = "Marc Beck König", email = "marc.beck.konig@cern.ch" }
 ]
 
 
