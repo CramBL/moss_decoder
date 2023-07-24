@@ -33,4 +33,3 @@ hyperfine \
     --time-unit millisecond\
     --shell=bash\
     --export-markdown dev-bench.md
-

@@ -28,6 +28,3 @@ build:
     rules:
         - if: $CI_PIPELINE_SOURCE == "push"
           when: manual
-
-
-
