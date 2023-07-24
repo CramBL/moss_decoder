@@ -24,19 +24,17 @@ impl MossWord {
     const DATA_2: u8 = 0b1000_0000; // 10_<hit_col_pos[5:0]>
     const DELIMITER: u8 = 0xFA; // subject to change (FPGA implementation detail)
 
-    pub fn from_byte(b: u8) -> Result<MossWord, ()> {
+    pub fn from_byte(b: u8) -> MossWord {
         match b {
             // Exact matches
-            Self::IDLE => Ok(Self::Idle),
-            Self::UNIT_FRAME_TRAILER => Ok(Self::UnitFrameTrailer),
-            six_msb if six_msb & 0b1111_1100 == Self::REGION_HEADER => Ok(Self::RegionHeader),
-            four_msb if four_msb & 0b1111_0000 == Self::UNIT_FRAME_HEADER => {
-                Ok(Self::UnitFrameHeader)
-            }
-            Self::DELIMITER => Ok(Self::Delimiter),
-            two_msb if two_msb & 0b1100_0000 == Self::DATA_0 => Ok(Self::Data0),
-            two_msb if two_msb & 0b1100_0000 == Self::DATA_1 => Ok(Self::Data1),
-            two_msb if two_msb & 0b1100_0000 == Self::DATA_2 => Ok(Self::Data2),
+            Self::IDLE => Self::Idle,
+            Self::UNIT_FRAME_TRAILER => Self::UnitFrameTrailer,
+            six_msb if six_msb & 0b1111_1100 == Self::REGION_HEADER => Self::RegionHeader,
+            four_msb if four_msb & 0b1111_0000 == Self::UNIT_FRAME_HEADER => Self::UnitFrameHeader,
+            Self::DELIMITER => Self::Delimiter,
+            two_msb if two_msb & 0b1100_0000 == Self::DATA_0 => Self::Data0,
+            two_msb if two_msb & 0b1100_0000 == Self::DATA_1 => Self::Data1,
+            two_msb if two_msb & 0b1100_0000 == Self::DATA_2 => Self::Data2,
             val => unreachable!("Unreachable: {val}"),
         }
     }
