@@ -31,6 +31,8 @@ use moss_protocol::MossWord;
 fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event, m)?)?;
 
+    m.add_function(wrap_pyfunction!(decode_event_noexcept, m)?)?;
+
     m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
 
     m.add_class::<MossHit>()?;
@@ -94,6 +96,23 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     };
 
     Ok((moss_packet, trailer_idx))
+}
+
+/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte.
+/// This function does not return an error if no MOSS packet is found, instead the last_trailer_idx is returned as 0.
+#[pyfunction]
+pub fn decode_event_noexcept(bytes: &[u8]) -> (MossPacket, usize) {
+    let byte_cnt = bytes.len();
+
+    if byte_cnt < 6 {
+        return (MossPacket::default(), 0);
+    }
+
+    if let Ok((moss_packet, trailer_idx)) = raw_decode_event(bytes) {
+        (moss_packet, trailer_idx)
+    } else {
+        (MossPacket::default(), 0)
+    }
 }
 
 fn raw_decode_event(bytes: &[u8]) -> Result<(MossPacket, usize), ()> {
