@@ -440,12 +440,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "local test file needed"]
     fn test_read_file_decode() {
         let time = std::time::Instant::now();
 
         println!("Reading file...");
-        let f = std::fs::read(std::path::PathBuf::from("../moss_noise.raw")).unwrap();
+        let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
         println!(
             "Read file in: {t:?}. Bytes: {cnt}",
             t = time.elapsed(),
