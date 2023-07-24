@@ -1,4 +1,5 @@
-"""Integration tests. Uses the `moss_decoder` package from python and allows benchmarks."""
+"""Integration tests. Uses the `moss_decoder` package
+from python and allows benchmarks."""
 from pathlib import Path
 import moss_decoder
 
@@ -54,7 +55,12 @@ def decode_multi_event(raw_bytes: bytes) -> tuple[list["MossPacket"], int]:
 
 def test_decode_multi_event():
     """Test that multiple events are correctly decoded from raw bytes"""
-    print(("=== Test that multiple events " "are correctly decoded from raw bytes ==="))
+    print(
+        (
+            "=== Test that multiple events \
+           are correctly decoded from raw bytes ==="
+        )
+    )
     raw_bytes = read_bytes_from_file(FILE_PATH)
     byte_count = len(raw_bytes)
     last_byte_idx = byte_count - 1
@@ -79,15 +85,17 @@ def test_decode_multi_event():
 
 
 def test_moss_packet_print():
+    """Test that the `MossPacket` class can be printed as expected in python"""
     print("=== Test printing of MossPacket class ===")
     moss_event = make_simple_moss_event_packet()
-    mp, rest = moss_decoder.decode_event(moss_event)
-    print(f"type of MossPacket: {type(mp)}")
-    print(f"Print MossPacket: {mp}")
+    moss_packet, _rest = moss_decoder.decode_event(moss_event)
+    print(f"type of MossPacket: {type(moss_packet)}")
+    print(f"Print MossPacket: {moss_packet}")
     print("==> Test OK\n\n")
 
 
 def test_100k_single_decodes(effecient=False):
+    """Tests 100k calls to decode_event (single event decoding)"""
     print(("=== Test 100k calls to decode_event ==="))
     raw_bytes = read_bytes_from_file(FILE_PATH)
     byte_count = len(raw_bytes)
