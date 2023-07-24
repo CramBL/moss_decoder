@@ -144,6 +144,34 @@ pub fn decode_multiple_events_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
 
     let mut last_trailer_idx = 0;
 
+    while let Ok((moss_packet, trailer_idx)) = decode_event_alt(&bytes[last_trailer_idx..]) {
+        moss_packets.push(moss_packet);
+        last_trailer_idx += trailer_idx + 1;
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyTypeError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok((moss_packets, last_trailer_idx - 1))
+    }
+}
+
+#[pyfunction]
+pub fn decode_event_alt(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
+    let byte_cnt = bytes.len();
+
+    if byte_cnt < 6 {
+        return Err(PyTypeError::new_err(
+            "Received less than the minimum event size",
+        ));
+    }
+
+    let mut moss_packet = MossPacket {
+        unit_id: INVALID_NO_HEADER_SEEN, // placeholder
+        hits: Vec::new(),
+    };
+
+    let mut trailer_idx = 0;
     let mut is_moss_packet = false;
     let mut current_region: u8 = 0xff; // placeholder
 
@@ -153,23 +181,28 @@ pub fn decode_multiple_events_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
             MossWord::UnitFrameHeader => {
                 debug_assert!(!is_moss_packet);
                 is_moss_packet = true;
-                moss_packets.push(MossPacket {
-                    unit_id: *byte & 0x0F,
-                    hits: Vec::new(),
-                });
+                moss_packet.unit_id = *byte & 0x0F
             }
             MossWord::UnitFrameTrailer => {
-                debug_assert!(is_moss_packet);
-                is_moss_packet = false;
-                last_trailer_idx = i;
+                debug_assert!(
+                    is_moss_packet,
+                    "Trailer seen before header, next 10 bytes: {:#X?}",
+                    &bytes[i..i + 10]
+                );
+                trailer_idx = i;
+                break;
             }
             MossWord::RegionHeader => {
-                debug_assert!(is_moss_packet);
+                debug_assert!(
+                    is_moss_packet,
+                    "Region header seen before header, next 10 bytes: {:#X?}",
+                    &bytes[i..i + 10]
+                );
                 current_region = *byte & 0x03;
             }
             MossWord::Data0 => {
                 debug_assert!(is_moss_packet);
-                moss_packets.last_mut().unwrap().hits.push(MossHit {
+                moss_packet.hits.push(MossHit {
                     region: current_region,            // region id
                     row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
                     column: 0,                         // placeholder
@@ -178,41 +211,23 @@ pub fn decode_multiple_events_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
             MossWord::Data1 => {
                 debug_assert!(is_moss_packet);
                 // row position [2:0]
-                moss_packets
-                    .last_mut()
-                    .unwrap()
-                    .hits
-                    .last_mut()
-                    .unwrap()
-                    .row |= ((*byte & 0x38) >> 3) as u16;
+                moss_packet.hits.last_mut().unwrap().row |= ((*byte & 0x38) >> 3) as u16;
                 // col position [8:6]
-                moss_packets
-                    .last_mut()
-                    .unwrap()
-                    .hits
-                    .last_mut()
-                    .unwrap()
-                    .column = ((*byte & 0x07) as u16) << 6;
+                moss_packet.hits.last_mut().unwrap().column = ((*byte & 0x07) as u16) << 6;
             }
             MossWord::Data2 => {
                 debug_assert!(is_moss_packet);
-                moss_packets
-                    .last_mut()
-                    .unwrap()
-                    .hits
-                    .last_mut()
-                    .unwrap()
-                    .column |= (*byte & 0x3F) as u16; // col position [5:0]
+                moss_packet.hits.last_mut().unwrap().column |= (*byte & 0x3F) as u16;
+                // col position [5:0]
             }
             MossWord::Delimiter => {
                 debug_assert!(!is_moss_packet);
             }
         }
     }
-
-    if moss_packets.is_empty() {
-        Err(PyTypeError::new_err("No MOSS Packets in events"))
+    if moss_packet.unit_id == INVALID_NO_HEADER_SEEN {
+        Err(PyTypeError::new_err("No MOSS Packets in event"))
     } else {
-        Ok((moss_packets, last_trailer_idx))
+        Ok((moss_packet, trailer_idx))
     }
 }
