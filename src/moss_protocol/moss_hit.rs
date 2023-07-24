@@ -21,8 +21,8 @@ impl MossHit {
         }
     }
 
-    pub fn __str__(&self) -> PyResult<String> {
-        Ok(self.to_string())
+    pub fn __str__(&self) -> String {
+        self.to_string()
     }
 }
 
@@ -49,6 +49,6 @@ mod tests {
         let moss_hit = MossHit::default();
 
         println!("{moss_hit}");
-        println!("{str}", str = moss_hit.__str__().unwrap());
+        println!("{str}", str = moss_hit.__str__());
     }
 }

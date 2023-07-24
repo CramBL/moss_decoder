@@ -20,8 +20,8 @@ impl MossPacket {
         }
     }
 
-    fn __str__(&self) -> PyResult<String> {
-        Ok(self.to_string())
+    fn __str__(&self) -> String {
+        self.to_string()
     }
 }
 
