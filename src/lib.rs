@@ -1,3 +1,23 @@
+#![warn(missing_copy_implementations)]
+#![warn(trivial_casts, trivial_numeric_casts)]
+#![warn(unused_results)]
+#![warn(unused_import_braces)]
+#![warn(variant_size_differences)]
+#![warn(
+    clippy::option_filter_map,
+    clippy::manual_filter_map,
+    clippy::if_not_else,
+    clippy::nonminimal_bool
+)]
+// Performance lints
+#![warn(
+    clippy::needless_pass_by_value,
+    clippy::unnecessary_wraps,
+    clippy::mutex_integer,
+    clippy::mem_forget,
+    clippy::maybe_infinite_iter
+)]
+
 use moss_protocol::MossPacket;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
