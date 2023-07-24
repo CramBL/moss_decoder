@@ -109,10 +109,10 @@ fn test_decoding_single_event() {
     //
     let event = fake_event_simple();
 
-    let (packet, unprocessed_bytes) = decode_event(&event).unwrap();
+    let (packet, last_trailer_idx) = decode_event(&event).unwrap();
 
     assert!(
-        unprocessed_bytes.is_empty(),
+        last_trailer_idx == event.len() - 1,
         "All bytes were not processed!"
     );
 
@@ -148,70 +148,14 @@ fn test_decoding_multiple_events_one_call() {
 
     let mut moss_packets: Vec<MossPacket> = Vec::new();
 
+    // There's multiple events in the data but we only call decode_event once so we should only get one packet
     if let Ok((packet, _unprocessed_data)) = decode_event(&events) {
         moss_packets.push(packet);
     }
 
     let packet_count = moss_packets.len();
 
-    println!("{packet_count}");
-
-    for p in moss_packets {
-        println!("{p:?}");
-    }
-}
-
-#[test]
-fn test_decoding_multiple_events() {
-    let mut events = fake_multiple_events();
-
-    let mut moss_packets: Vec<MossPacket> = Vec::new();
-
-    while let Ok((packet, unprocessed_data)) = decode_event(&events) {
-        moss_packets.push(packet);
-        events = unprocessed_data;
-    }
-
-    let packet_count = moss_packets.len();
-
-    println!("{packet_count}");
-
-    for p in moss_packets {
-        println!("{p:?}");
-    }
-}
-
-#[test]
-fn test_decoding_multiple_events_alt() {
-    let events = fake_multiple_events();
-
-    let (packets, unprocessed_data) = decode_multiple_events_alt(&events).unwrap();
-
-    let packet_count = packets.len();
-
-    println!("last trailer at idx: {unprocessed_data}");
-    println!("{packet_count}");
-
-    for p in packets {
-        println!("{p:?}");
-    }
-}
-
-#[test]
-fn test_decoding_multiple_events_delimiter() {
-    let mut events = fake_multiple_events();
-    events.append(&mut vec![0xFA, 0xFA, 0xFA]);
-
-    let mut moss_packets: Vec<MossPacket> = Vec::new();
-
-    while let Ok((packet, unprocessed_data)) = decode_event(&events) {
-        moss_packets.push(packet);
-        events = unprocessed_data;
-    }
-
-    let packet_count = moss_packets.len();
-
-    println!("{packet_count}");
+    assert_eq!(packet_count, 1, "Expected 1 packet, got {}", packet_count);
 
     for p in moss_packets {
         println!("{p:?}");
@@ -231,9 +175,16 @@ fn test_read_file_decode() {
     );
 
     println!("Decoding content...");
-    let (p, last_trailer_idx) = decode_multiple_events_alt(&f).unwrap();
+    let (p, last_trailer_idx) = decode_multiple_events(&f).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets}", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
+
+    assert_eq!(
+        last_trailer_idx,
+        f.len() - 2,
+        "All bytes were not processed!"
+    );
+    assert_eq!(p.len(), 100000, "Expected 100k packets, got {}", p.len());
 }
