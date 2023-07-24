@@ -22,7 +22,7 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
 const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
 /// Decodes a single MOSS event into a [MossPacket]
 #[pyfunction]
-fn decode_event(bytes: Vec<u8>) -> PyResult<(MossPacket, Vec<u8>)> {
+fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, Vec<u8>)> {
     let mut hits = Vec::new();
 
     let mut packet = MossPacket {
@@ -35,45 +35,43 @@ fn decode_event(bytes: Vec<u8>) -> PyResult<(MossPacket, Vec<u8>)> {
     let mut current_region: u8 = 0xff; // placeholder
 
     for (i, byte) in bytes.iter().enumerate() {
-        if let Ok(word) = MossWord::from_byte(*byte) {
-            match word {
-                MossWord::Idle => (),
-                MossWord::UnitFrameHeader => {
-                    debug_assert!(!is_moss_packet);
-                    is_moss_packet = true;
-                    packet.unit_id = *byte & 0x0F
-                }
-                MossWord::UnitFrameTrailer => {
-                    debug_assert!(is_moss_packet);
-                    processed_bytes_idx = i + 1;
-                    break;
-                }
-                MossWord::RegionHeader => {
-                    debug_assert!(is_moss_packet);
-                    current_region = *byte & 0x03;
-                }
-                MossWord::Data0 => {
-                    debug_assert!(is_moss_packet);
-                    hits.push(MossHit {
-                        region: current_region,            // region id
-                        row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
-                        column: 0,                         // placeholder
-                    });
-                }
-                MossWord::Data1 => {
-                    debug_assert!(is_moss_packet);
-                    // row position [2:0]
-                    hits.last_mut().unwrap().row |= ((*byte & 0x38) >> 3) as u16;
-                    // col position [8:6]
-                    hits.last_mut().unwrap().column = ((*byte & 0x07) as u16) << 6;
-                }
-                MossWord::Data2 => {
-                    debug_assert!(is_moss_packet);
-                    hits.last_mut().unwrap().column |= (*byte & 0x3F) as u16; // col position [5:0]
-                }
-                MossWord::Delimiter => {
-                    debug_assert!(!is_moss_packet);
-                }
+        match MossWord::from_byte(*byte) {
+            MossWord::Idle => (),
+            MossWord::UnitFrameHeader => {
+                debug_assert!(!is_moss_packet);
+                is_moss_packet = true;
+                packet.unit_id = *byte & 0x0F
+            }
+            MossWord::UnitFrameTrailer => {
+                debug_assert!(is_moss_packet);
+                processed_bytes_idx = i + 1;
+                break;
+            }
+            MossWord::RegionHeader => {
+                debug_assert!(is_moss_packet);
+                current_region = *byte & 0x03;
+            }
+            MossWord::Data0 => {
+                debug_assert!(is_moss_packet);
+                hits.push(MossHit {
+                    region: current_region,            // region id
+                    row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
+                    column: 0,                         // placeholder
+                });
+            }
+            MossWord::Data1 => {
+                debug_assert!(is_moss_packet);
+                // row position [2:0]
+                hits.last_mut().unwrap().row |= ((*byte & 0x38) >> 3) as u16;
+                // col position [8:6]
+                hits.last_mut().unwrap().column = ((*byte & 0x07) as u16) << 6;
+            }
+            MossWord::Data2 => {
+                debug_assert!(is_moss_packet);
+                hits.last_mut().unwrap().column |= (*byte & 0x3F) as u16; // col position [5:0]
+            }
+            MossWord::Delimiter => {
+                debug_assert!(!is_moss_packet);
             }
         }
     }
@@ -91,7 +89,7 @@ fn decode_event(bytes: Vec<u8>) -> PyResult<(MossPacket, Vec<u8>)> {
 fn decode_multiple_events(mut bytes: Vec<u8>) -> PyResult<Vec<MossPacket>> {
     let mut moss_packets: Vec<MossPacket> = Vec::new();
 
-    while let Ok((packet, unprocessed_data)) = decode_event(bytes) {
+    while let Ok((packet, unprocessed_data)) = decode_event(&bytes) {
         moss_packets.push(packet);
         bytes = unprocessed_data;
     }
@@ -130,66 +128,64 @@ fn decode_multiple_events_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
     let mut current_region: u8 = 0xff; // placeholder
 
     for (i, byte) in bytes.iter().enumerate() {
-        if let Ok(word) = MossWord::from_byte(*byte) {
-            match word {
-                MossWord::Idle => (),
-                MossWord::UnitFrameHeader => {
-                    debug_assert!(!is_moss_packet);
-                    is_moss_packet = true;
-                    moss_packets.push(MossPacket {
-                        unit_id: *byte & 0x0F,
-                        hits: Vec::new(),
-                    });
-                }
-                MossWord::UnitFrameTrailer => {
-                    debug_assert!(is_moss_packet);
-                    is_moss_packet = false;
-                    last_trailer_idx = i;
-                }
-                MossWord::RegionHeader => {
-                    debug_assert!(is_moss_packet);
-                    current_region = *byte & 0x03;
-                }
-                MossWord::Data0 => {
-                    debug_assert!(is_moss_packet);
-                    moss_packets.last_mut().unwrap().hits.push(MossHit {
-                        region: current_region,            // region id
-                        row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
-                        column: 0,                         // placeholder
-                    });
-                }
-                MossWord::Data1 => {
-                    debug_assert!(is_moss_packet);
-                    // row position [2:0]
-                    moss_packets
-                        .last_mut()
-                        .unwrap()
-                        .hits
-                        .last_mut()
-                        .unwrap()
-                        .row |= ((*byte & 0x38) >> 3) as u16;
-                    // col position [8:6]
-                    moss_packets
-                        .last_mut()
-                        .unwrap()
-                        .hits
-                        .last_mut()
-                        .unwrap()
-                        .column = ((*byte & 0x07) as u16) << 6;
-                }
-                MossWord::Data2 => {
-                    debug_assert!(is_moss_packet);
-                    moss_packets
-                        .last_mut()
-                        .unwrap()
-                        .hits
-                        .last_mut()
-                        .unwrap()
-                        .column |= (*byte & 0x3F) as u16; // col position [5:0]
-                }
-                MossWord::Delimiter => {
-                    debug_assert!(!is_moss_packet);
-                }
+        match MossWord::from_byte(*byte) {
+            MossWord::Idle => (),
+            MossWord::UnitFrameHeader => {
+                debug_assert!(!is_moss_packet);
+                is_moss_packet = true;
+                moss_packets.push(MossPacket {
+                    unit_id: *byte & 0x0F,
+                    hits: Vec::new(),
+                });
+            }
+            MossWord::UnitFrameTrailer => {
+                debug_assert!(is_moss_packet);
+                is_moss_packet = false;
+                last_trailer_idx = i;
+            }
+            MossWord::RegionHeader => {
+                debug_assert!(is_moss_packet);
+                current_region = *byte & 0x03;
+            }
+            MossWord::Data0 => {
+                debug_assert!(is_moss_packet);
+                moss_packets.last_mut().unwrap().hits.push(MossHit {
+                    region: current_region,            // region id
+                    row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
+                    column: 0,                         // placeholder
+                });
+            }
+            MossWord::Data1 => {
+                debug_assert!(is_moss_packet);
+                // row position [2:0]
+                moss_packets
+                    .last_mut()
+                    .unwrap()
+                    .hits
+                    .last_mut()
+                    .unwrap()
+                    .row |= ((*byte & 0x38) >> 3) as u16;
+                // col position [8:6]
+                moss_packets
+                    .last_mut()
+                    .unwrap()
+                    .hits
+                    .last_mut()
+                    .unwrap()
+                    .column = ((*byte & 0x07) as u16) << 6;
+            }
+            MossWord::Data2 => {
+                debug_assert!(is_moss_packet);
+                moss_packets
+                    .last_mut()
+                    .unwrap()
+                    .hits
+                    .last_mut()
+                    .unwrap()
+                    .column |= (*byte & 0x3F) as u16; // col position [5:0]
+            }
+            MossWord::Delimiter => {
+                debug_assert!(!is_moss_packet);
             }
         }
     }
@@ -314,7 +310,7 @@ mod tests {
         //
         let event = fake_event_simple();
 
-        let (packet, unprocessed_bytes) = decode_event(event).unwrap();
+        let (packet, unprocessed_bytes) = decode_event(&event).unwrap();
 
         assert!(
             unprocessed_bytes.is_empty(),
@@ -353,7 +349,7 @@ mod tests {
 
         let mut moss_packets: Vec<MossPacket> = Vec::new();
 
-        if let Ok((packet, _unprocessed_data)) = decode_event(events) {
+        if let Ok((packet, _unprocessed_data)) = decode_event(&events) {
             moss_packets.push(packet);
         }
 
@@ -372,7 +368,7 @@ mod tests {
 
         let mut moss_packets: Vec<MossPacket> = Vec::new();
 
-        while let Ok((packet, unprocessed_data)) = decode_event(events) {
+        while let Ok((packet, unprocessed_data)) = decode_event(&events) {
             moss_packets.push(packet);
             events = unprocessed_data;
         }
@@ -409,7 +405,7 @@ mod tests {
 
         let mut moss_packets: Vec<MossPacket> = Vec::new();
 
-        while let Ok((packet, unprocessed_data)) = decode_event(events) {
+        while let Ok((packet, unprocessed_data)) = decode_event(&events) {
             moss_packets.push(packet);
             events = unprocessed_data;
         }
