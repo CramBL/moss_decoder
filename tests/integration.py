@@ -84,8 +84,61 @@ def test_moss_packet_print():
     mp, rest = moss_decoder.decode_event(moss_event)
     print(f"type of MossPacket: {type(mp)}")
     print(f"Print MossPacket: {mp}")
+    print("==> Test OK\n\n")
+
+
+def test_100k_single_decodes(effecient=False):
+    print(("=== Test 100k calls to decode_event ==="))
+    raw_bytes = read_bytes_from_file(FILE_PATH)
+    byte_count = len(raw_bytes)
+    last_byte_idx = byte_count - 1
+
+    print(f"Read {byte_count} bytes")
+
+    packets = []
+    last_trailer_idx = 0
+
+    if effecient is False:
+        more_data = True
+        while more_data:
+            try:
+                pack, tmp_trailer_idx = moss_decoder.decode_event(
+                    raw_bytes[last_trailer_idx:]
+                )
+                packets.append(pack)
+                last_trailer_idx = last_trailer_idx + tmp_trailer_idx + 1
+            except TypeError as exc:
+                print(f"Decode event returned: {exc}")
+                more_data = False
+
+    if effecient is True:
+        res = 1
+        packets = []
+        while res != 0:
+            packet, res = moss_decoder.decode_event_noexcept(
+                raw_bytes[last_trailer_idx:]
+            )
+            if res != 0:
+                last_trailer_idx = last_trailer_idx + res + 1
+                packets.append(packet)
+
+    last_trailer_idx = last_trailer_idx - 1
+
+    print(f"Decoded {len(packets)} packets")
+    print(f"Last trailer at index: {last_trailer_idx}/{last_byte_idx}")
+    remainder_count = last_byte_idx - last_trailer_idx
+    print(f"Remainder: {remainder_count} byte(s)")
+
+    if byte_count > last_trailer_idx:
+        print(f"Remainder byte(s): {raw_bytes[last_trailer_idx+1:]}")
+
+    assert (
+        remainder_count == 1
+    ), f"Expected last trailer found at index 1, got: {remainder_count}"
+    print("==> Test OK\n\n")
 
 
 if __name__ == "__main__":
     test_decode_multi_event()
     test_moss_packet_print()
+    test_100k_single_decodes(effecient=True)

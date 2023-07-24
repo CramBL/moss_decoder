@@ -115,6 +115,7 @@ pub fn decode_event_noexcept(bytes: &[u8]) -> (MossPacket, usize) {
     }
 }
 
+/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte (Rust only)
 fn raw_decode_event(bytes: &[u8]) -> Result<(MossPacket, usize), ()> {
     let mut moss_packet = MossPacket {
         unit_id: INVALID_NO_HEADER_SEEN, // placeholder
