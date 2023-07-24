@@ -15,7 +15,7 @@ source .venv/bin/activate
 python -m pip freeze
 
 # Install most recent published version
-python -m pip install moss-decoder --upgrade
+python -m pip install moss-decoder --upgrade --no-cache-dir
 
 # Show installed packages
 python -m pip freeze
