@@ -4,27 +4,27 @@ variables:
 stages:
     - build
 
+default:
+    before_script:
+        - hostname -I
+        - whoami
+        - pwd
+        - which python
+        - python --version
+        - echo $PATH
 
-before_script:
-  - hostname -I
-  - whoami
-  - pwd
-  - which python
-  - python --version
-  - echo $PATH
 
-
-
-build:
+build-centos:
+    stage: build
+    when: manual
+    needs: []
+    dependencies: []
+    cache: []
     image: ${DOCKER_REGISTRY}/fpga-lint
     script:
-        - pip install maturin
+        - python -m pip install maturin
         - maturin build
     artifacts:
         name: "${CI_COMMIT_SHA}"
         paths:
         - $CI_PROJECT_DIR/target/
-
-    rules:
-        - if: $CI_PIPELINE_SOURCE == "push"
-          when: manual
