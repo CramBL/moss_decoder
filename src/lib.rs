@@ -21,7 +21,7 @@
 use std::io::Read;
 
 pub use moss_protocol::MossPacket;
-use pyo3::exceptions::{PyAttributeError, PyTypeError};
+use pyo3::exceptions::{PyAssertionError, PyFileNotFoundError, PyValueError};
 use pyo3::prelude::*;
 
 pub mod moss_protocol;
@@ -54,7 +54,7 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
     let byte_cnt = bytes.len();
 
     if byte_cnt < 6 {
-        return Err(PyTypeError::new_err(
+        return Err(PyValueError::new_err(
             "Received less than the minimum event size",
         ));
     }
@@ -75,7 +75,7 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
     }
 
     if moss_packets.is_empty() {
-        Err(PyTypeError::new_err("No MOSS Packets in events"))
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
         Ok((moss_packets, last_trailer_idx - 1))
     }
@@ -90,7 +90,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     let byte_cnt = bytes.len();
 
     if byte_cnt < 6 {
-        return Err(PyTypeError::new_err(
+        return Err(PyValueError::new_err(
             "Received less than the minimum event size",
         ));
     }
@@ -99,7 +99,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     {
         (moss_packet, trailer_idx)
     } else {
-        return Err(PyTypeError::new_err("No MOSS Packets in event"));
+        return Err(PyAssertionError::new_err("No MOSS Packets in event"));
     };
 
     Ok((moss_packet, trailer_idx))
@@ -134,7 +134,7 @@ pub fn decode_from_file(path: String) -> PyResult<Vec<MossPacket>> {
     // Open file (get file descriptor)
     let file = match std::fs::File::open(path) {
         Ok(file) => file,
-        Err(e) => return Err(PyErr::new::<PyTypeError, _>(e.to_string())),
+        Err(e) => return Err(PyFileNotFoundError::new_err(e.to_string())),
     };
 
     // Create buffered reader with 1MB capacity to minimize syscalls to read
@@ -168,7 +168,7 @@ pub fn decode_from_file(path: String) -> PyResult<Vec<MossPacket>> {
     }
 
     if moss_packets.is_empty() {
-        Err(PyAttributeError::new_err("No MOSS Packets in events"))
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
         Ok(moss_packets)
     }
