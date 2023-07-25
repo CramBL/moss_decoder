@@ -5,7 +5,7 @@ use std::fmt::write;
 use std::fmt::Display;
 
 #[pyclass(get_all)]
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 /// A single hit from a MOSS region.
 pub struct MossHit {
     /// The region ID of the hit.
