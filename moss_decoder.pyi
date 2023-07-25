@@ -7,16 +7,17 @@ class MossHit:
     column: int
     row: int
 
-    def __init__(self, region: int, row: int, column: int) -> "MossHit":
+    def __init__(self, region: int, row: int, column: int) -> MossHit:
         self.region = region
         self.column = column
         self.row = row
-    def region(self) -> int:  # Get the MOSS region ID
-        """Get the Region ID"""
-        return self.region
-    def row(self) -> int:
-        """Get the Row"""
-        return self.row
-    def column(self) -> int:
-        """Get the Column"""
-        return self.column
+
+class MossPacket:
+    """A decoded MOSS event packet with a `Unit ID` and a list of `MossHit`s"""
+
+    unit_id: int
+    hits: list[MossHit]
+
+    def __init__(self, unit_id: int) -> MossPacket:
+        self.unit_id = unit_id
+        self.hits = []
