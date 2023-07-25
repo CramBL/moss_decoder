@@ -193,7 +193,8 @@ fn test_read_file_decode() {
 fn test_decode_from_file() {
     let time = std::time::Instant::now();
 
-    let packets = moss_decoder::decode_from_file("tests/moss_noise.raw".to_string()).unwrap();
+    let packets =
+        moss_decoder::decode_from_file("tests/moss_noise.raw".to_string().into()).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets}", packets = packets.len());
