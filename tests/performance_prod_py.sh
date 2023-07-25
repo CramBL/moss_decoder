@@ -2,30 +2,37 @@
 
 # Prerequisites: cargo, python >= 3.7, pip, test file and script.
 
-readonly SCRIPT_PATH="tests/integration.py"
-readonly CMD="python ${SCRIPT_PATH}"
+# Utility functions
+# shellcheck disable=SC1091
+source ./tests/utils.sh
 
-python -V
+function measure_performance_dev {
+    python -V
 
-# Make virtual environment
-python -m venv .venv
-# Activate it
-source .venv/bin/activate
-# Show installed packages
-python -m pip freeze
+    # Make virtual environment
+    python -m venv .venv
+    # Activate it
+    source .venv/bin/activate
+    # Show installed packages
+    python -m pip freeze
 
-# Install most recent published version
-python -m pip install moss-decoder --upgrade --no-cache-dir --force-reinstall
+    # Install most recent published version
+    python -m pip install moss-decoder --upgrade --no-cache-dir --force-reinstall
 
-# Show installed packages
-python -m pip freeze
+    # Show installed packages
+    python -m pip freeze
 
-cargo install hyperfine --locked
+    cargo install hyperfine --locked
 
-hyperfine \
-    "${CMD}"\
-    --warmup 3\
-    --style full\
-    --time-unit millisecond\
-    --shell=bash\
-    --export-markdown prod-bench.md
+    hyperfine \
+        "${BENCH_CMD}"\
+        --warmup 3\
+        --style full\
+        --time-unit millisecond\
+        --shell=bash\
+        --export-markdown prod-bench.md
+}
+
+if [[ $# -eq 0 ]] ; then
+    measure_performance_dev
+fi
