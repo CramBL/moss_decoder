@@ -1,5 +1,6 @@
 """Integration tests. Uses the `moss_decoder` package
 from python and allows benchmarks."""
+import sys  # Don't want to depend on `argparse`
 from pathlib import Path
 import moss_decoder
 
@@ -94,7 +95,7 @@ def test_moss_packet_print():
     print("==> Test OK\n\n")
 
 
-def test_100k_single_decodes(effecient=False):
+def test_100k_single_decodes(noexcept=False):
     """Tests 100k calls to decode_event (single event decoding)"""
     print(("=== Test 100k calls to decode_event ==="))
     raw_bytes = read_bytes_from_file(FILE_PATH)
@@ -106,7 +107,7 @@ def test_100k_single_decodes(effecient=False):
     packets = []
     last_trailer_idx = 0
 
-    if effecient is False:
+    if noexcept is False:
         more_data = True
         while more_data:
             try:
@@ -119,7 +120,7 @@ def test_100k_single_decodes(effecient=False):
                 print(f"Decode event returned: {exc}")
                 more_data = False
 
-    if effecient is True:
+    if noexcept is True:
         res = 1
         packets = []
         while res != 0:
@@ -147,6 +148,15 @@ def test_100k_single_decodes(effecient=False):
 
 
 if __name__ == "__main__":
+    args = sys.argv
+
+    if len(args) > 1:
+        if args[1] == "benchmark":
+            # Just run this and then exit
+            test_decode_multi_event()
+            exit(0)
+
     test_decode_multi_event()
     test_moss_packet_print()
-    test_100k_single_decodes(effecient=True)
+    test_100k_single_decodes()
+    test_100k_single_decodes(noexcept=True)
