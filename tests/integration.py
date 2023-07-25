@@ -154,7 +154,7 @@ if __name__ == "__main__":
         if args[1] == "benchmark":
             # Just run this and then exit
             test_decode_multi_event()
-            exit(0)
+            sys.exit(0)
 
     test_decode_multi_event()
     test_moss_packet_print()
