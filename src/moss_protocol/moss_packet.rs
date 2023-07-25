@@ -24,6 +24,16 @@ impl MossPacket {
         }
     }
 
+    fn __repr__(slf: &PyCell<Self>) -> PyResult<String> {
+        let class_name: &str = slf.get_type().name()?;
+        Ok(format!(
+            "{} ({} {:?})",
+            class_name,
+            slf.borrow().unit_id,
+            slf.borrow().hits,
+        ))
+    }
+
     fn __str__(&self) -> String {
         self.to_string()
     }
