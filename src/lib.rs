@@ -44,6 +44,7 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
 const MIN_PREALLOC: usize = 10;
 
 /// Decodes multiple MOSS events into a list of [MossPacket]s
+/// This function is optimized for speed and memory usage.
 #[pyfunction]
 pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
     let byte_cnt = bytes.len();
@@ -78,6 +79,8 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
 
 const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte
+/// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
+/// the call should be enclosed in a try/catch.
 #[pyfunction]
 pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     let byte_cnt = bytes.len();
@@ -100,6 +103,8 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
 
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte.
 /// This function does not return an error if no MOSS packet is found, instead the last_trailer_idx is returned as 0.
+/// In the case no MOSS packet is found, the a `MossPacket` is still returned with default values which is unit ID 0
+/// and no hits, but this result is invalid and should be discarded.
 #[pyfunction]
 pub fn decode_event_noexcept(bytes: &[u8]) -> (MossPacket, usize) {
     let byte_cnt = bytes.len();
@@ -113,6 +118,11 @@ pub fn decode_event_noexcept(bytes: &[u8]) -> (MossPacket, usize) {
     } else {
         (MossPacket::default(), 0)
     }
+}
+
+#[pyfunction]
+pub fn decode_from_file(path: String) -> PyResult<Vec<MossPacket>> {
+    Err(PyTypeError::new_err("Not implemented"))
 }
 
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte (Rust only)

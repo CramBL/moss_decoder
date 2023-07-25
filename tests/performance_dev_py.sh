@@ -3,7 +3,7 @@
 # Prerequisites: cargo, python >= 3.7, pip, test file and script.
 
 readonly SCRIPT_PATH="tests/integration.py"
-readonly CMD="python ${SCRIPT_PATH}"
+readonly CMD="python ${SCRIPT_PATH} benchmark"
 
 python -V
 
@@ -17,10 +17,17 @@ python -m pip freeze
 # install cargo and maturin
 cargo install hyperfine --locked
 
-#python -m pip install maturin
-
 # Build and install the local package
-maturin develop
+maturin build --release
+
+# Get filename of the produced binary
+wheel_bin=$(ls -t target/wheels/ | head -n 1)
+# Install it
+python -m pip install "target/wheels/${wheel_bin}" --upgrade --no-cache-dir --force-reinstall
+
+# Show installed packages
+python -m pip freeze
+
 
 # Check Moss version
 python -m pip freeze
