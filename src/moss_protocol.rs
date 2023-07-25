@@ -3,6 +3,7 @@ pub mod moss_packet;
 pub use moss_hit::MossHit;
 pub use moss_packet::MossPacket;
 
+#[derive(Debug, PartialEq)]
 pub(crate) enum MossWord {
     Idle,
     UnitFrameHeader,
@@ -27,14 +28,14 @@ impl MossWord {
     pub fn from_byte(b: u8) -> MossWord {
         match b {
             // Exact matches
-            Self::IDLE => Self::Idle,
-            Self::UNIT_FRAME_TRAILER => Self::UnitFrameTrailer,
-            six_msb if six_msb & 0b1111_1100 == Self::REGION_HEADER => Self::RegionHeader,
-            four_msb if four_msb & 0b1111_0000 == Self::UNIT_FRAME_HEADER => Self::UnitFrameHeader,
+            Self::IDLE => MossWord::Idle,
+            Self::UNIT_FRAME_TRAILER => MossWord::UnitFrameTrailer,
+            six_msb if six_msb & 0xFC == Self::REGION_HEADER => MossWord::RegionHeader,
+            four_msb if four_msb & 0xF0 == Self::UNIT_FRAME_HEADER => MossWord::UnitFrameHeader,
             Self::DELIMITER => Self::Delimiter,
-            two_msb if two_msb & 0b1100_0000 == Self::DATA_0 => Self::Data0,
-            two_msb if two_msb & 0b1100_0000 == Self::DATA_1 => Self::Data1,
-            two_msb if two_msb & 0b1100_0000 == Self::DATA_2 => Self::Data2,
+            two_msb if two_msb & 0b1100_0000 == Self::DATA_0 => MossWord::Data0,
+            two_msb if two_msb & 0b1100_0000 == Self::DATA_1 => MossWord::Data1,
+            two_msb if two_msb & 0b1100_0000 == Self::DATA_2 => MossWord::Data2,
             val => unreachable!("Unreachable: {val}"),
         }
     }
