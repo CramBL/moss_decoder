@@ -178,7 +178,7 @@ fn test_read_file_decode() {
     let (p, last_trailer_idx) = decode_multiple_events(&f).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
-    println!("Got: {packets}", packets = p.len());
+    println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
 
     assert_eq!(
@@ -187,4 +187,21 @@ fn test_read_file_decode() {
         "All bytes were not processed!"
     );
     assert_eq!(p.len(), 100000, "Expected 100k packets, got {}", p.len());
+}
+
+#[test]
+fn test_decode_from_file() {
+    let time = std::time::Instant::now();
+
+    let packets = moss_decoder::decode_from_file("tests/moss_noise.raw".to_string()).unwrap();
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    println!("Got: {packets}", packets = packets.len());
+
+    assert_eq!(
+        packets.len(),
+        100000,
+        "Expected 100k packets, got {}",
+        packets.len()
+    );
 }
