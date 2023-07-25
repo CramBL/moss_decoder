@@ -37,7 +37,7 @@ Decoding the 10 MB MOSS readout data. Performed on CentOS Stream 9 with Python 3
 
 If you update the package source code and want to build and install without publishing and fetching from PyPI, you can follow these steps.
 
-The `.gitlab-ci.yml` file contains a `build-centos` manual job which will build the MOSS decoder package from source and saves the package as an artifact.
+The `.CERN-gitlab-ci.yml` file contains a `build-centos` manual job which will build the MOSS decoder package from source and saves the package as an artifact.
 
 1. Start the job, download the artifacts.
 2. Unzip the artifacts and you will find a `wheels` package in `/target/wheels/` with the `.whl` extension
@@ -47,4 +47,4 @@ The `.gitlab-ci.yml` file contains a `build-centos` manual job which will build 
 ### Troubleshooting
 if you get `ERROR: Could not find a version that satisfies the requirement ...` make sure to add `.whl` when performing step 3 above.
 
-if you don't see the expected message at step 4, try running the installation command in step 3 with `--upgrade` and/or `--no-cache-dir`.
+if you don't see the expected message at step 4, try running the installation command in step 3 with any or all of these options `--upgrade --no-cache-dir --force-reinstall`.
