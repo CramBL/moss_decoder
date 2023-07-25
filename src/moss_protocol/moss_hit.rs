@@ -27,6 +27,17 @@ impl MossHit {
         }
     }
 
+    fn __repr__(slf: &PyCell<Self>) -> PyResult<String> {
+        let class_name: &str = slf.get_type().name()?;
+        Ok(format!(
+            "{}({} {} {})",
+            class_name,
+            slf.borrow().region,
+            slf.borrow().row,
+            slf.borrow().column
+        ))
+    }
+
     /// Returns a string representation of the [MossHit] instance.
     pub fn __str__(&self) -> String {
         self.to_string()
