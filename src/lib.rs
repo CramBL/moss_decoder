@@ -133,7 +133,7 @@ const READER_BUFFER_CAPACITY: usize = 10 * 1024 * 1024; // 10 MiB
 /// Decodes a file containing raw MOSS data into a list of [MossPacket]s
 ///
 /// The file is read in chunks of 10 MiB until the end of the file is reached.
-pub fn decode_from_file(path: String) -> PyResult<Vec<MossPacket>> {
+pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
     // Open file (get file descriptor)
     let file = match std::fs::File::open(path) {
         Ok(file) => file,
