@@ -1,5 +1,6 @@
 //! struct representation of a single hit from a MOSS region.
 use pyo3::prelude::*;
+use pyo3::pyclass::CompareOp;
 use std::fmt::write;
 use std::fmt::Display;
 
@@ -29,6 +30,12 @@ impl MossHit {
     /// Returns a string representation of the [MossHit] instance.
     pub fn __str__(&self) -> String {
         self.to_string()
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
+        op.matches(self.region.cmp(&other.region))
+            && op.matches(self.row.cmp(&other.row))
+            && op.matches(self.column.cmp(&other.column))
     }
 }
 
