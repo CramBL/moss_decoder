@@ -1,5 +1,5 @@
 //! MOSS packet structure implementation.
-use pyo3::prelude::*;
+use pyo3::{prelude::*, pyclass::CompareOp};
 use std::fmt::{write, Display};
 
 use super::MossHit;
@@ -26,6 +26,10 @@ impl MossPacket {
 
     fn __str__(&self) -> String {
         self.to_string()
+    }
+
+    fn __richcmp__(&self, other: &Self, op: CompareOp) -> bool {
+        op.matches(self.unit_id.cmp(&other.unit_id)) && op.matches(self.hits.cmp(&other.hits))
     }
 }
 
