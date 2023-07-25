@@ -136,9 +136,13 @@ def test_100k_single_decodes(noexcept=False):
                 )
                 packets.append(pack)
                 last_trailer_idx = last_trailer_idx + tmp_trailer_idx + 1
-            except TypeError as exc:
-                print(f"Decode event returned: {exc}")
+            except ValueError as exc:
+                print(f"Decode event returned value error: {exc}")
                 more_data = False
+            except AssertionError as exc:
+                print(f"Decode event returned assertion error: {exc}")
+                more_data = False
+                raise exc
 
     if noexcept is True:
         res = 1
