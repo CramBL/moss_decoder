@@ -1,3 +1,4 @@
+#![forbid(unused_extern_crates)]
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts, trivial_numeric_casts)]
 #![warn(unused_results)]
