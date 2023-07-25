@@ -1,3 +1,4 @@
+//! MOSS packet structure implementation.
 use pyo3::prelude::*;
 use std::fmt::{write, Display};
 
@@ -5,8 +6,11 @@ use super::MossHit;
 
 #[pyclass(get_all)]
 #[derive(Debug, Default, Clone, PartialEq)]
+/// A single MOSS packet with the associated [MossHit]s.
 pub struct MossPacket {
+    /// The unit ID of the packet.
     pub unit_id: u8,
+    /// The hits in the packet.
     pub hits: Vec<MossHit>,
 }
 

@@ -1,12 +1,17 @@
+//! struct representation of a single hit from a MOSS region.
 use pyo3::prelude::*;
 use std::fmt::write;
 use std::fmt::Display;
 
 #[pyclass(get_all)]
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
+/// A single hit from a MOSS region.
 pub struct MossHit {
+    /// The region ID of the hit.
     pub region: u8,
+    /// The row of the hit.
     pub row: u16,
+    /// The column of the hit.
     pub column: u16,
 }
 
@@ -21,6 +26,7 @@ impl MossHit {
         }
     }
 
+    /// Returns a string representation of the [MossHit] instance.
     pub fn __str__(&self) -> String {
         self.to_string()
     }

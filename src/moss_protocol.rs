@@ -1,3 +1,4 @@
+//! Module containing the MOSS readout protocol and basic structures to analyze the data.
 pub mod moss_hit;
 pub mod moss_packet;
 pub use moss_hit::MossHit;

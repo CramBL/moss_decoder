@@ -1,4 +1,6 @@
+//! A Python module for decoding raw MOSS data implemented in Rust.
 #![forbid(unused_extern_crates)]
+#![deny(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(trivial_casts, trivial_numeric_casts)]
 #![warn(unused_results)]
