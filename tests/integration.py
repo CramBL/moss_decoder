@@ -1,8 +1,10 @@
 """Integration tests. Uses the `moss_decoder` package
 from python and allows benchmarks."""
 import sys  # Don't want to depend on `argparse`
+import time
 from pathlib import Path
 import moss_decoder
+from moss_decoder import MossPacket, decode_event
 
 FILE_PATH = Path("tests/moss_noise.raw")
 
@@ -89,15 +91,33 @@ def test_moss_packet_print():
     """Test that the `MossPacket` class can be printed as expected in python"""
     print("=== Test printing of MossPacket class ===")
     moss_event = make_simple_moss_event_packet()
-    moss_packet, _rest = moss_decoder.decode_event(moss_event)
+    moss_packet, _rest = decode_event(moss_event)
     print(f"type of MossPacket: {type(moss_packet)}")
     print(f"Print MossPacket: {moss_packet}")
+    print("Print MossPacket attributes")
+    print(f"\tUnit ID: {moss_packet.unit_id}")
+    print("Iterate over hits of the MOSS packet and print the hits")
+    for hit in moss_packet.hits:
+        print(f"\tHits: {hit}")
+
+    print("Print MOSS Hit attributes")
+    for hit in moss_packet.hits:
+        print(f"\tHits: {hit}")
+        print(f"\t\tHit region: {hit.region}")
+        print(f"\t\tHit row: {hit.row}")
+        print(f"\t\tHit column: {hit.column}")
+
     print("==> Test OK\n\n")
 
 
 def test_100k_single_decodes(noexcept=False):
     """Tests 100k calls to decode_event (single event decoding)"""
-    print(("=== Test 100k calls to decode_event ==="))
+
+    if noexcept:
+        print(("=== Test 100k calls to decode_event with noexcept ==="))
+    else:
+        print(("=== Test 100k calls to decode_event ==="))
+
     raw_bytes = read_bytes_from_file(FILE_PATH)
     byte_count = len(raw_bytes)
     last_byte_idx = byte_count - 1
@@ -155,8 +175,15 @@ if __name__ == "__main__":
             # Just run this and then exit
             test_decode_multi_event()
             sys.exit(0)
-
+    start = time.time()
     test_decode_multi_event()
+    print(f"Done in: {time.time()-start:.3f} s\n")
+    start = time.time()
     test_moss_packet_print()
+    print(f"Done in: {time.time()-start:.3f} s\n")
+    start = time.time()
     test_100k_single_decodes()
+    print(f"Done in: {time.time()-start:.3f} s\n")
+    start = time.time()
     test_100k_single_decodes(noexcept=True)
+    print(f"Done in: {time.time()-start:.3f} s\n")
