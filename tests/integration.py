@@ -4,7 +4,7 @@ import sys  # Don't want to depend on `argparse`
 import time
 from pathlib import Path
 import moss_decoder
-from moss_decoder import MossPacket, decode_event
+from moss_decoder import MossPacket, decode_event, MossHit
 
 FILE_PATH = Path("tests/moss_noise.raw")
 
@@ -171,6 +171,42 @@ def test_100k_single_decodes(noexcept=False):
     print("==> Test OK\n\n")
 
 
+def test_fundamental_class_comparisons():
+    """Test fundamental class functionality"""
+
+    print("=== Comparing MossHit attributes ===\n")
+    hit_a = MossHit(0, 1, 2)
+    hit_b = MossHit(0, 1, 2)
+    assert hit_a == hit_b, f"{hit_a} != {hit_b}"
+    print("__eq__ is OK")
+
+    print(repr(hit_a) + " == " + repr(hit_a))
+    assert repr(hit_a) == repr(hit_b)
+    print("__repr__ is OK")
+
+    print(str(hit_a) + " == " + str(hit_b))
+    assert str(hit_a) == str(hit_b)
+
+    print("__str__ is OK")
+    print("==> MossHit is OK\n\n")
+
+    print("=== Comparing MossPacket attributes ===\n")
+    pack_a = MossPacket(1)
+    pack_b = MossPacket(1)
+    assert pack_a == pack_b, f"{pack_a} != {pack_b}"
+    print("__eq__ is OK")
+
+    print(repr(pack_a) + " == " + repr(pack_b))
+    assert repr(pack_a) == repr(pack_b)
+    print("__repr__ is OK")
+
+    print(str(pack_a) + " == " + str(pack_b))
+    assert str(pack_a) == str(pack_b)
+    print("__str__ is OK")
+
+    print("==> MossPacket is OK\n\n")
+
+
 if __name__ == "__main__":
     args = sys.argv
 
@@ -179,6 +215,9 @@ if __name__ == "__main__":
             # Just run this and then exit
             test_decode_multi_event()
             sys.exit(0)
+
+    test_fundamental_class_comparisons()
+
     start = time.time()
     test_decode_multi_event()
     print(f"Done in: {time.time()-start:.3f} s\n")
