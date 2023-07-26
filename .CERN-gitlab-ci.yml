@@ -24,6 +24,7 @@ build-centos:
     script:
         - python -m pip install maturin
         - maturin build --release
+        - PATH="/root/.cargo/bin:${PATH}"
     artifacts:
         name: "${CI_COMMIT_SHA}"
         paths:
