@@ -59,7 +59,7 @@ dependencies = [
 
 [[package]]
 name = "moss_decoder"
-version = "0.4.2"
+version = "0.4.3"
 dependencies = [
  "pretty_assertions",
  "pyo3",
