@@ -104,6 +104,31 @@ fn fake_multiple_events() -> Vec<u8> {
     ]
 }
 
+fn fake_event_protocol_error() -> Vec<u8> {
+    vec![
+        UNIT_FRAME_HEADER_0,
+        IDLE,
+        IDLE,
+        REGION_HEADER_0,
+        // Hit row 2, col 8
+        0x00,
+        0xF0, // Protocol error
+        0x88,
+        REGION_HEADER_1,
+        // Hit row 301, col 433
+        0x25,
+        0x6E,
+        0xB1,
+        REGION_HEADER_2,
+        REGION_HEADER_3,
+        // Hit row 2, col 8
+        0x00,
+        0x50,
+        0x88,
+        UNIT_FRAME_TRAILER,
+    ]
+}
+
 #[test]
 fn test_decoding_single_event() {
     //
@@ -205,4 +230,23 @@ fn test_decode_from_file() {
         "Expected 100k packets, got {}",
         packets.len()
     );
+}
+
+#[test]
+fn test_decode_protocol_error() {
+    pyo3::prepare_freethreaded_python();
+
+    let event = fake_event_protocol_error();
+
+    match decode_event(&event) {
+        Ok(_) => {
+            panic!("This packet has a protocol error, but it was not detected!")
+        }
+        Err(e) if e.to_string().contains("Protocol error") => {
+            println!("Got expected error: {e}");
+        }
+        Err(e) => {
+            panic!("Got unexpected error: {e}");
+        }
+    }
 }
