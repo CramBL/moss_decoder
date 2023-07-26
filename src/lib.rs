@@ -98,14 +98,12 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
         ));
     }
 
-    let (moss_packet, trailer_idx) = if let Ok((moss_packet, trailer_idx)) = raw_decode_event(bytes)
-    {
-        (moss_packet, trailer_idx)
-    } else {
-        return Err(PyAssertionError::new_err("No MOSS Packets in event"));
-    };
-
-    Ok((moss_packet, trailer_idx))
+    match raw_decode_event(bytes) {
+        Ok((moss_packet, trailer_idx)) => Ok((moss_packet, trailer_idx)),
+        Err(e) => Err(PyAssertionError::new_err(format!(
+            "No MOSS packet found: {e}",
+        ))),
+    }
 }
 
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte.
@@ -178,7 +176,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 }
 
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte (Rust only)
-fn raw_decode_event(bytes: &[u8]) -> Result<(MossPacket, usize), ()> {
+fn raw_decode_event(bytes: &[u8]) -> std::io::Result<(MossPacket, usize)> {
     let mut moss_packet = MossPacket {
         unit_id: INVALID_NO_HEADER_SEEN, // placeholder
         hits: Vec::new(),
@@ -236,10 +234,26 @@ fn raw_decode_event(bytes: &[u8]) -> Result<(MossPacket, usize), ()> {
             MossWord::Delimiter => {
                 debug_assert!(!is_moss_packet);
             }
+            MossWord::ProtocolError => {
+                let describe_decode_state = if is_moss_packet {
+                    "in MOSS packet"
+                } else {
+                    "before header seen"
+                };
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "Protocol error {describe_decode_state}, at index {i} with byte {byte:#X} "
+                    ),
+                ));
+            }
         }
     }
     if moss_packet.unit_id == INVALID_NO_HEADER_SEEN || trailer_idx == 0 {
-        Err(())
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "No MOSS packet found",
+        ))
     } else {
         Ok((moss_packet, trailer_idx))
     }
