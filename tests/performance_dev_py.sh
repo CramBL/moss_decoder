@@ -18,6 +18,7 @@ function measure_performance_prod {
 
     # install cargo and maturin
     cargo install hyperfine --locked
+    python -m pip install maturin
 
     # Build and install the local package
     maturin build --release
