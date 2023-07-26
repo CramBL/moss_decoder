@@ -1,5 +1,5 @@
 variables:
-    DOCKER_REGISTRY: "gitlab-registry.cern.ch/alice-its3-wp3/moss-testing/docker/python-rust"
+    DOCKER_REGISTRY: "gitlab-registry.cern.ch/alice-its3-wp3/moss-testing/docker"
 
 stages:
     - build
@@ -20,7 +20,7 @@ build-centos:
     needs: []
     dependencies: []
     cache: []
-    image: ${DOCKER_REGISTRY}/fpga-lint
+    image: ${DOCKER_REGISTRY}/python-rust
     script:
         - python -m pip install maturin
         - maturin build --release
