@@ -4,7 +4,8 @@ import sys  # Don't want to depend on `argparse`
 import time
 from pathlib import Path
 import moss_decoder
-from moss_decoder import MossPacket, decode_event, MossHit
+from moss_decoder import MossPacket, MossHit
+from moss_decoder import decode_event, decode_event_noexcept
 
 FILE_PATH = Path("tests/moss_noise.raw")
 
@@ -148,9 +149,7 @@ def test_100k_single_decodes(noexcept=False):
         res = 1
         packets = []
         while res != 0:
-            packet, res = moss_decoder.decode_event_noexcept(
-                raw_bytes[last_trailer_idx:]
-            )
+            packet, res = decode_event_noexcept(raw_bytes[last_trailer_idx:])
             if res != 0:
                 last_trailer_idx = last_trailer_idx + res + 1
                 packets.append(packet)
