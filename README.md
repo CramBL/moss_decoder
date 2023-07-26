@@ -8,6 +8,7 @@ Python module implemented in Rust for decoding raw data from the MOSS chip (Stit
 
 - [MOSS Decoder](#moss-decoder)
   - [Installation](#installation)
+    - [Example](#example)
   - [Motivation \& Purpose](#motivation--purpose)
   - [@CERN Gitlab installation for CentOS and similar distributions from local build](#cern-gitlab-installation-for-centos-and-similar-distributions-from-local-build)
     - [Troubleshooting](#troubleshooting)
@@ -17,16 +18,23 @@ Python module implemented in Rust for decoding raw data from the MOSS chip (Stit
 $ pip install moss-decoder
 ```
 Import in python and use for decoding raw data.
+### Example
 ```python
 import moss_decoder
-moss_packets = moss_decoder.decode_event(bytes)
+
+moss_packet = moss_decoder.decode_from_file("path/to/raw_data.raw")
+print(moss_packet[0])
+# Unit ID: 6 Hits: 44
+#  [MossHit { region: 0, row: 3, column: 11 }, MossHit { region: 0, row: 18, column: 243 }, ...
+print(moss_packet[0].hits[0])
+# reg: 0 row: 3 col: 11
 ```
 ## Motivation & Purpose
 Decoding in native Python is slow and the MOSS verification team at CERN got to a point where we needed more performance.
 
 Earliest version of a Rust package gave massive improvements as shown in the benchmark below.
 
-Decoding the 10 MB MOSS readout data. Performed on CentOS Stream 9 with Python 3.11
+Decoding 10 MB MOSS readout data with 100k event data packets and ~2.7 million hits. Performed on CentOS Stream 9 with Python 3.11
 
 | Command                                          |       Mean [s] | Min [s] | Max [s] |      Relative |
 | :----------------------------------------------- | -------------: | ------: | ------: | ------------: |
