@@ -14,6 +14,7 @@ pub(crate) enum MossWord {
     Data1,
     Data2,
     Delimiter,
+    ProtocolError,
 }
 
 impl MossWord {
@@ -37,7 +38,7 @@ impl MossWord {
             two_msb if two_msb & 0b1100_0000 == Self::DATA_0 => MossWord::Data0,
             two_msb if two_msb & 0b1100_0000 == Self::DATA_1 => MossWord::Data1,
             two_msb if two_msb & 0b1100_0000 == Self::DATA_2 => MossWord::Data2,
-            val => unreachable!("Unreachable: {val}"),
+            _ => MossWord::ProtocolError,
         }
     }
 }
