@@ -217,6 +217,8 @@ fn test_read_file_decode() {
 #[test]
 fn test_decode_from_file() {
     let time = std::time::Instant::now();
+    let expect_packets = 100000;
+    let expect_hits = 2716940;
 
     let packets =
         moss_decoder::decode_from_file("tests/moss_noise.raw".to_string().into()).unwrap();
@@ -226,9 +228,16 @@ fn test_decode_from_file() {
 
     assert_eq!(
         packets.len(),
-        100000,
-        "Expected 100k packets, got {}",
+        expect_packets,
+        "Expected {expect_packets} packets, got {}",
         packets.len()
+    );
+
+    // Count total hits
+    let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, expect_hits,
+        "Expected {expect_hits} hits, got {total_hits}",
     );
 }
 
