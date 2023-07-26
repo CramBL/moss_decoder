@@ -48,42 +48,6 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-const MIN_PREALLOC: usize = 10;
-
-/// Decodes multiple MOSS events into a list of [MossPacket]s
-/// This function is optimized for speed and memory usage.
-#[pyfunction]
-pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
-    let byte_cnt = bytes.len();
-
-    if byte_cnt < 6 {
-        return Err(PyValueError::new_err(
-            "Received less than the minimum event size",
-        ));
-    }
-
-    let approx_moss_packets = if byte_cnt / 1024 > MIN_PREALLOC {
-        byte_cnt / 1024
-    } else {
-        MIN_PREALLOC
-    };
-
-    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
-
-    let mut last_trailer_idx = 0;
-
-    while let Ok((moss_packet, trailer_idx)) = decode_event(&bytes[last_trailer_idx..]) {
-        moss_packets.push(moss_packet);
-        last_trailer_idx += trailer_idx + 1;
-    }
-
-    if moss_packets.is_empty() {
-        Err(PyAssertionError::new_err("No MOSS Packets in events"))
-    } else {
-        Ok((moss_packets, last_trailer_idx - 1))
-    }
-}
-
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte
 /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
 /// the call should be enclosed in a try/catch.
@@ -121,6 +85,41 @@ pub fn decode_event_noexcept(bytes: &[u8]) -> (MossPacket, usize) {
         (moss_packet, trailer_idx)
     } else {
         (MossPacket::default(), 0)
+    }
+}
+
+const MIN_PREALLOC: usize = 10;
+/// Decodes multiple MOSS events into a list of [MossPacket]s
+/// This function is optimized for speed and memory usage.
+#[pyfunction]
+pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
+    let byte_cnt = bytes.len();
+
+    if byte_cnt < 6 {
+        return Err(PyValueError::new_err(
+            "Received less than the minimum event size",
+        ));
+    }
+
+    let approx_moss_packets = if byte_cnt / 1024 > MIN_PREALLOC {
+        byte_cnt / 1024
+    } else {
+        MIN_PREALLOC
+    };
+
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
+
+    let mut last_trailer_idx = 0;
+
+    while let Ok((moss_packet, trailer_idx)) = decode_event(&bytes[last_trailer_idx..]) {
+        moss_packets.push(moss_packet);
+        last_trailer_idx += trailer_idx + 1;
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok((moss_packets, last_trailer_idx - 1))
     }
 }
 
