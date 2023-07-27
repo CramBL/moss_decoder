@@ -23,8 +23,8 @@ build-centos:
     image: ${DOCKER_REGISTRY}/python-rust
     script:
         - python -m pip install maturin
-        - maturin build --release
         - PATH="/root/.cargo/bin:${PATH}"
+        - maturin build --release
     artifacts:
         name: "${CI_COMMIT_SHA}"
         paths:
