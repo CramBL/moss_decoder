@@ -14,6 +14,9 @@ categories = ["python-module"]
 name = "moss_decoder"
 crate-type = ["cdylib", "rlib"]
 
+[dependencies]
+sm = "0.9.0"
+
 [dev-dependencies]
 pretty_assertions = "1.4.0"
 
