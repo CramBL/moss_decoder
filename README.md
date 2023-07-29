@@ -45,7 +45,7 @@ Decoding 10 MB MOSS readout data with 100k event data packets and ~2.7 million h
 ## MOSS event data packet protocol FSM
 
 ```mermaid
-stateDiagram
+stateDiagram-v2
   frame_header : Unit Frame Header
   frame_trailer : Unit Frame Trailer
   region_header : Region Header
@@ -61,13 +61,18 @@ stateDiagram
     region_header --> region_header
     region_header --> data_0
 
-    data_0 --> data_1
-    data_1 --> data_2
+    state DATA {
+      
+      data_0 --> data_1
+      data_1 --> data_2
 
+      data_2 --> data_0
+      data_2 --> idle
+    }
+    
     data_2 --> region_header
-    data_2 --> data_0
     data_2 --> frame_trailer
-    data_2 --> idle
+
 
     idle --> data_0
     idle --> frame_trailer
