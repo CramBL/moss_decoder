@@ -1,5 +1,5 @@
 #![allow(non_camel_case_types)]
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code)]
 //! Contains an FSM implementation of the MOSS data readout protocol
 sm::sm! {
 
@@ -68,12 +68,14 @@ impl Default for MossFsm {
 
 impl MossFsm {
     /// Create a new state machine in the initial state.
+    #[inline]
     pub(crate) fn new() -> Self {
         Self {
             state_machine: MossReadoutFSM::Machine::new(_AWAITING_).as_enum(),
         }
     }
 
+    #[inline]
     pub(crate) fn reset(&mut self) {
         self.state_machine = MossReadoutFSM::Machine::new(_AWAITING_).as_enum()
     }
@@ -81,10 +83,18 @@ impl MossFsm {
     #[inline]
     pub(crate) fn advance(&mut self, byte: u8) -> MossWord {
         let (current_word, next_state): (MossWord, Variant) = match self.state_machine.clone() {
-            Initial_AWAITING_(st) => (
-                MossWord::UnitFrameHeader,
-                st.transition(_WasFrameHeader).as_enum(),
-            ),
+            Initial_AWAITING_(st) => match byte {
+                MossWord::DELIMITER => {
+                    (MossWord::Delimiter, st.transition(_WasDelimiter).as_enum())
+                }
+                0xD0..=0xD9 => (
+                    MossWord::UnitFrameHeader,
+                    st.transition(_WasFrameHeader).as_enum(),
+                ),
+                _ => unreachable!(
+                    "In initial state, expected Delimiter or Unit Frame Header, got: {byte:#X}"
+                ),
+            },
             FRAME_HEADER_By_WasFrameHeader(st) => (
                 MossWord::RegionHeader,
                 st.transition(_WasRegionHeader).as_enum(),
@@ -100,7 +110,7 @@ impl MossFsm {
                     st.transition(_WasFrameTrailer).as_enum(),
                 ),
                 _ => unreachable!(
-                    "Expected Region Header, DATA 0, or Unit Frame Trailer got: {byte:#X}"
+                    "Expected Region Header, DATA 0, or Unit Frame Trailer, got: {byte:#X}"
                 ),
             },
             DATA0_By_WasData0(st) => (MossWord::Data1, st.transition(_WasData1).as_enum()),
@@ -203,12 +213,8 @@ pub fn add_data2(moss_packets: &mut [MossPacket], data2: u8) {
 mod tests {
     use pretty_assertions::assert_eq;
 
-    use crate::MossPacket;
-
-    use super::MossReadoutFSM::Variant::*;
-    use super::MossReadoutFSM::IDLE_;
-    use super::MossReadoutFSM::*;
     use super::*;
+    use crate::MossPacket;
 
     const IDLE: u8 = 0xFF;
     const UNIT_FRAME_TRAILER: u8 = 0xE0;
