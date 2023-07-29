@@ -91,24 +91,11 @@ pub fn decode_event_noexcept(bytes: &[u8]) -> (MossPacket, usize) {
     }
 }
 
-const MIN_PREALLOC: usize = 10;
 /// Decodes multiple MOSS events into a list of [MossPacket]s
 /// This function is optimized for speed and memory usage.
 #[pyfunction]
 pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
-    let byte_cnt = bytes.len();
-
-    if byte_cnt < 6 {
-        return Err(PyValueError::new_err(
-            "Received less than the minimum event size",
-        ));
-    }
-
-    let approx_moss_packets = if byte_cnt / 1024 > MIN_PREALLOC {
-        byte_cnt / 1024
-    } else {
-        MIN_PREALLOC
-    };
+    let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
 
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
 
@@ -185,43 +172,26 @@ pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
     let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
 
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
-
     let mut moss_fsm = moss_protocol_fsm::MossFsm::new();
 
     let mut current_region: u8 = 0xFF; // Placeholder
     let mut last_trailer_idx: usize = 0;
     for (i, byte) in bytes.iter().enumerate() {
         match moss_fsm.advance(*byte) {
-            MossWord::Idle => (), //println!("IDLE {byte:#X}")
-
-            MossWord::UnitFrameHeader => {
-                //println!("UNIT FRAME HEADER {byte:#X}");
-                moss_packets.push(MossPacket::new(byte & 0x0F));
-            }
-            MossWord::UnitFrameTrailer => {
-                last_trailer_idx = i;
-                //println!("UNIT FRAME TRAILER {byte:#X}");
-            }
-            MossWord::RegionHeader => {
-                //println!("REGION HEADER {byte:#X}");
-                current_region = byte & 0x03;
-            }
+            MossWord::UnitFrameHeader => moss_packets.push(MossPacket::new(byte & 0x0F)),
+            MossWord::UnitFrameTrailer => last_trailer_idx = i,
+            MossWord::RegionHeader => current_region = byte & 0x03,
             MossWord::Data0 => {
-                //println!("DATA 0 {byte:#X}");
                 moss_protocol_fsm::add_data0(&mut moss_packets, *byte, current_region)
             }
-            MossWord::Data1 => {
-                //println!("DATA 1 {byte:#X}");
-                moss_protocol_fsm::add_data1(&mut moss_packets, *byte);
-            }
-            MossWord::Data2 => {
-                //println!("DATA 2 {byte:#X}");
-                moss_protocol_fsm::add_data2(&mut moss_packets, *byte)
-            }
-            MossWord::Delimiter => (), //println!("DELIMITER {byte:#X}"),
-            MossWord::ProtocolError => (), //println!("PROTOCOL ERROR {byte:#X}"),
+            MossWord::Data1 => moss_protocol_fsm::add_data1(&mut moss_packets, *byte),
+            MossWord::Data2 => moss_protocol_fsm::add_data2(&mut moss_packets, *byte),
+            MossWord::Idle => (),
+            MossWord::Delimiter => (),
+            MossWord::ProtocolError => (),
         }
     }
+
     if moss_packets.is_empty() {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
