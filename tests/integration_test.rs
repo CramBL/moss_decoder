@@ -11,11 +11,13 @@ const REGION_HEADER_3: u8 = 0xC3;
 fn fake_event_simple() -> Vec<u8> {
     vec![
         UNIT_FRAME_HEADER_0,
-        IDLE,
-        IDLE,
         REGION_HEADER_0,
         // Hit row 2, col 8
         0x00,
+        0x50,
+        0x88,
+        IDLE,
+        0x01,
         0x50,
         0x88,
         REGION_HEADER_1,
@@ -152,6 +154,11 @@ fn test_decoding_single_event() {
                     column: 8
                 },
                 MossHit {
+                    region: 0,
+                    row: 10,
+                    column: 8
+                },
+                MossHit {
                     region: 1,
                     row: 301,
                     column: 433
@@ -212,6 +219,8 @@ fn test_read_file_decode() {
         "All bytes were not processed!"
     );
     assert_eq!(p.len(), 100000, "Expected 100k packets, got {}", p.len());
+
+    println!("{:#X?}", f.get(..=50));
 }
 
 #[test]

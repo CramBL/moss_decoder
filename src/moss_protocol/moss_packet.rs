@@ -17,7 +17,7 @@ pub struct MossPacket {
 #[pymethods]
 impl MossPacket {
     #[new]
-    fn new(unit_id: u8) -> Self {
+    pub(crate) fn new(unit_id: u8) -> Self {
         Self {
             unit_id,
             hits: Vec::new(),
