@@ -11,6 +11,7 @@ Python module implemented in Rust for decoding raw data from the MOSS chip (Stit
     - [Example](#example)
   - [Motivation \& Purpose](#motivation--purpose)
   - [MOSS event data packet protocol FSM](#moss-event-data-packet-protocol-fsm)
+  - [Multiple event decoder FSM](#multiple-event-decoder-fsm)
   - [@CERN Gitlab installation for CentOS and similar distributions from local build](#cern-gitlab-installation-for-centos-and-similar-distributions-from-local-build)
     - [Troubleshooting](#troubleshooting)
 
@@ -59,28 +60,80 @@ stateDiagram-v2
     frame_header --> region_header
 
     region_header --> region_header
-    region_header --> data_0
+    region_header --> DATA
 
     state DATA {
-      
+      direction LR
+      [*] --> data_0
       data_0 --> data_1
       data_1 --> data_2
-
       data_2 --> data_0
-      data_2 --> idle
+      data_2 --> [*]
     }
     
-    data_2 --> region_header
-    data_2 --> frame_trailer
+    DATA --> idle
+    DATA --> region_header
+    DATA --> frame_trailer
 
 
-    idle --> data_0
+    idle --> DATA
     idle --> frame_trailer
 
     frame_trailer --> [*]
 
 ```
 
+## Multiple event decoder FSM
+If the decoder is decoding data containing multiple events, the following FSM is used.
+The `delimiter` is expected to be `0xFA`. The default `Idle` value `0xFF` is also assumed.
+```mermaid
+stateDiagram-v2
+direction LR
+  delimiter : Event Delimiter
+  frame_header : Unit Frame Header
+  frame_trailer : Unit Frame Trailer
+  region_header : Region Header
+  data_0 : Data 0
+  data_1 : Data 1
+  data_2 : Data 2
+  idle : Idle
+
+  [*] --> delimiter
+  delimiter --> EVENT
+  delimiter --> delimiter
+
+  state EVENT {
+
+    [*] --> frame_header
+    
+    frame_header --> region_header
+
+    region_header --> region_header
+    region_header --> DATA
+
+    state DATA {
+      direction LR
+      [*] --> data_0
+      data_0 --> data_1
+      data_1 --> data_2
+      data_2 --> data_0
+      data_2 --> [*]
+
+    }
+    
+    DATA --> region_header
+    DATA --> frame_trailer
+    DATA --> idle
+
+
+    idle --> DATA
+    idle --> frame_trailer
+
+    frame_trailer --> [*]
+  }
+  EVENT --> delimiter
+
+```
 ## @CERN Gitlab installation for CentOS and similar distributions from local build
 
 If you update the package source code and want to build and install without publishing and fetching from PyPI, you can follow these steps.
