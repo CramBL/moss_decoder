@@ -99,7 +99,9 @@ impl MossFsm {
                     MossWord::UnitFrameTrailer,
                     st.transition(_WasFrameTrailer).as_enum(),
                 ),
-                _ => unreachable!("GOT {byte:#X}"),
+                _ => unreachable!(
+                    "Expected Region Header, DATA 0, or Unit Frame Trailer got: {byte:#X}"
+                ),
             },
             DATA0_By_WasData0(st) => (MossWord::Data1, st.transition(_WasData1).as_enum()),
             DATA1_By_WasData1(st) => (MossWord::Data2, st.transition(_WasData2).as_enum()),
@@ -114,7 +116,9 @@ impl MossFsm {
                     MossWord::UnitFrameTrailer,
                     st.transition(_WasFrameTrailer).as_enum(),
                 ),
-                _ => unreachable!("Got {byte:#X}"),
+                _ => unreachable!(
+                    "Expected Region Header, DATA 0, or Unit Frame Trailer got: {byte:#X}"
+                ),
             },
             IDLE_By_WasIdle(st) => match byte {
                 0..=0b0011_1111 => (MossWord::Data0, st.transition(_WasData0).as_enum()),
@@ -122,7 +126,9 @@ impl MossFsm {
                     MossWord::UnitFrameTrailer,
                     st.transition(_WasFrameTrailer).as_enum(),
                 ),
-                _ => unreachable!(),
+                _ => unreachable!(
+                    "Expected Region Header, DATA 0, or Unit Frame Trailer got: {byte:#X}"
+                ),
             },
             FRAME_TRAILER_By_WasFrameTrailer(st) => match byte {
                 MossWord::DELIMITER => {
@@ -132,7 +138,7 @@ impl MossFsm {
                     MossWord::UnitFrameHeader,
                     st.transition(_WasFrameHeader).as_enum(),
                 ),
-                _ => unreachable!(),
+                _ => unreachable!("Expected Delimiter or Unit Frame Header, got: {byte:#X}"),
             },
             _AWAITING_By_WasDelimiter(st) => match byte {
                 MossWord::DELIMITER => {
@@ -142,7 +148,7 @@ impl MossFsm {
                     MossWord::UnitFrameHeader,
                     st.transition(_WasFrameHeader).as_enum(),
                 ),
-                _ => unreachable!(),
+                _ => unreachable!("Expected Delimiter or Unit Frame Header got: {byte:#X}"),
             },
         };
 
