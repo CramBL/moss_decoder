@@ -52,7 +52,8 @@ def decode_multi_event(raw_bytes: bytes) -> tuple[list["MossPacket"], int]:
     returns a tuple of `list[MossPackets]` and an int that indicates the
     index where the last MOSS trailer was seen
     """
-    packets, last_trailer_idx = moss_decoder.decode_multiple_events(raw_bytes)
+    packets, last_trailer_idx = moss_decoder.decode_multiple_events_fsm(
+        raw_bytes)
 
     return packets, last_trailer_idx
 
@@ -61,8 +62,8 @@ def test_decode_multi_event():
     """Test that multiple events are correctly decoded from raw bytes"""
     print(
         (
-            "=== Test that multiple events \
-           are correctly decoded from raw bytes ==="
+            "=== Test that multiple events"
+            "are correctly decoded from raw bytes ==="
         )
     )
     raw_bytes = read_bytes_from_file(FILE_PATH)
