@@ -165,6 +165,27 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
     }
 }
 
+/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte with an FSM based decoder.
+/// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
+/// the call should be enclosed in a try/catch.
+#[pyfunction]
+pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
+    let byte_cnt = bytes.len();
+
+    if byte_cnt < 6 {
+        return Err(PyValueError::new_err(
+            "Received less than the minimum event size",
+        ));
+    }
+
+    match rust_only::raw_decode_event_fsm(bytes) {
+        Ok((moss_packet, trailer_idx)) => Ok((moss_packet, trailer_idx)),
+        Err(e) => Err(PyAssertionError::new_err(format!(
+            "No MOSS packet found: {e}",
+        ))),
+    }
+}
+
 /// Decodes multiple MOSS events into a list of [MossPacket]s based on an FSM decoder.
 /// This function is optimized for speed and memory usage.
 #[pyfunction]
@@ -199,9 +220,32 @@ pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
     }
 }
 
+#[pyfunction]
+/// Alternative
+pub fn decode_multiple_events_fsm_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
+    let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
+
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
+
+    let mut last_trailer_idx = 0;
+
+    while let Ok((moss_packet, trailer_idx)) = decode_event_fsm(&bytes[last_trailer_idx..]) {
+        moss_packets.push(moss_packet);
+        last_trailer_idx += trailer_idx + 1;
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok((moss_packets, last_trailer_idx))
+    }
+}
+
 mod rust_only {
     use pyo3::exceptions::PyValueError;
     use pyo3::PyResult;
+
+    use crate::moss_protocol_fsm;
 
     /// Functions that are only used in Rust and not exposed to Python.
     use super::MossHit;
@@ -229,6 +273,7 @@ mod rust_only {
 
     const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
     /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte (Rust only)
+    #[inline]
     pub(crate) fn raw_decode_event(bytes: &[u8]) -> std::io::Result<(MossPacket, usize)> {
         let mut moss_packet = MossPacket {
             unit_id: INVALID_NO_HEADER_SEEN, // placeholder
@@ -302,6 +347,85 @@ mod rust_only {
                 }
             }
         }
+        if moss_packet.unit_id == INVALID_NO_HEADER_SEEN || trailer_idx == 0 {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "No MOSS packet found",
+            ))
+        } else {
+            Ok((moss_packet, trailer_idx))
+        }
+    }
+
+    #[inline]
+    pub(crate) fn raw_decode_event_fsm(bytes: &[u8]) -> std::io::Result<(MossPacket, usize)> {
+        let mut moss_fsm = moss_protocol_fsm::MossFsm::new();
+        let mut moss_packet = MossPacket {
+            unit_id: INVALID_NO_HEADER_SEEN, // placeholder
+            hits: Vec::new(),
+        };
+
+        let mut current_region: u8 = 0xFF; // Placeholder
+        let mut trailer_idx: usize = 0;
+        let mut is_moss_packet = false;
+
+        for (i, byte) in bytes.iter().enumerate() {
+            match moss_fsm.advance(*byte) {
+                MossWord::UnitFrameHeader => {
+                    debug_assert!(!is_moss_packet);
+                    is_moss_packet = true;
+                    moss_packet.unit_id = *byte & 0x0F
+                }
+                MossWord::UnitFrameTrailer => {
+                    debug_assert!(
+                        is_moss_packet,
+                        "Trailer seen before header, next 10 bytes: {:#X?}",
+                        &bytes[i..i + 10]
+                    );
+                    trailer_idx = i;
+                    break;
+                }
+                MossWord::RegionHeader => {
+                    debug_assert!(
+                        is_moss_packet,
+                        "Region header seen before frame header at index {i}, current and next 9 bytes:\n {:#X?}",
+                    &bytes[i..i + 10]
+                    );
+                    current_region = *byte & 0x03
+                }
+                MossWord::Data0 => moss_packet.hits.push(MossHit {
+                    region: current_region,            // region id
+                    row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
+                    column: 0,                         // placeholder
+                }),
+                MossWord::Data1 => {
+                    // row position [2:0]
+                    moss_packet.hits.last_mut().unwrap().row |= ((*byte & 0x38) >> 3) as u16;
+                    // col position [8:6]
+                    moss_packet.hits.last_mut().unwrap().column = ((*byte & 0x07) as u16) << 6;
+                }
+                MossWord::Data2 => {
+                    // col position [5:0]
+                    moss_packet.hits.last_mut().unwrap().column |= (*byte & 0x3F) as u16
+                }
+                MossWord::ProtocolError => {
+                    let describe_decode_state = if is_moss_packet {
+                        "in MOSS packet"
+                    } else {
+                        "before header seen"
+                    };
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!(
+                        "Protocol error {describe_decode_state}, at index {i} with byte {byte:#X} "
+                    ),
+                    ));
+                }
+                MossWord::Delimiter => debug_assert!(!is_moss_packet),
+                MossWord::Idle => debug_assert!(is_moss_packet),
+            }
+        }
+
         if moss_packet.unit_id == INVALID_NO_HEADER_SEEN || trailer_idx == 0 {
             Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
