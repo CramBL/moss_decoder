@@ -30,6 +30,7 @@ use pyo3::prelude::*;
 pub mod moss_protocol;
 pub use moss_protocol::MossHit;
 use moss_protocol::MossWord;
+pub mod moss_protocol_fsm;
 
 /// A Python module for decoding raw MOSS data in Rust.
 #[pymodule]
@@ -39,6 +40,8 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event_noexcept, m)?)?;
 
     m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
+
+    m.add_function(wrap_pyfunction!(decode_multiple_events_fsm, m)?)?;
 
     m.add_function(wrap_pyfunction!(decode_from_file, m)?)?;
 
@@ -175,11 +178,84 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
     }
 }
 
+/// Decodes multiple MOSS events into a list of [MossPacket]s based on an FSM decoder.
+/// This function is optimized for speed and memory usage.
+#[pyfunction]
+pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
+    let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
+
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
+
+    let mut moss_fsm = moss_protocol_fsm::MossFsm::new();
+
+    let mut current_region: u8 = 0xFF; // Placeholder
+    let mut last_trailer_idx: usize = 0;
+    for (i, byte) in bytes.iter().enumerate() {
+        match moss_fsm.advance(*byte) {
+            MossWord::Idle => (), //println!("IDLE {byte:#X}")
+
+            MossWord::UnitFrameHeader => {
+                //println!("UNIT FRAME HEADER {byte:#X}");
+                moss_packets.push(MossPacket::new(byte & 0x0F));
+            }
+            MossWord::UnitFrameTrailer => {
+                last_trailer_idx = i;
+                //println!("UNIT FRAME TRAILER {byte:#X}");
+            }
+            MossWord::RegionHeader => {
+                //println!("REGION HEADER {byte:#X}");
+                current_region = byte & 0x03;
+            }
+            MossWord::Data0 => {
+                //println!("DATA 0 {byte:#X}");
+                moss_protocol_fsm::add_data0(&mut moss_packets, *byte, current_region)
+            }
+            MossWord::Data1 => {
+                //println!("DATA 1 {byte:#X}");
+                moss_protocol_fsm::add_data1(&mut moss_packets, *byte);
+            }
+            MossWord::Data2 => {
+                //println!("DATA 2 {byte:#X}");
+                moss_protocol_fsm::add_data2(&mut moss_packets, *byte)
+            }
+            MossWord::Delimiter => (), //println!("DELIMITER {byte:#X}"),
+            MossWord::ProtocolError => (), //println!("PROTOCOL ERROR {byte:#X}"),
+        }
+    }
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok((moss_packets, last_trailer_idx))
+    }
+}
+
 mod rust_only {
+    use pyo3::exceptions::PyValueError;
+    use pyo3::PyResult;
+
     /// Functions that are only used in Rust and not exposed to Python.
     use super::MossHit;
     use super::MossPacket;
     use super::MossWord;
+
+    const MIN_PREALLOC: usize = 10;
+    #[inline]
+    pub(super) fn calc_prealloc_val(bytes: &[u8]) -> PyResult<usize> {
+        let byte_cnt = bytes.len();
+
+        if byte_cnt < 6 {
+            return Err(PyValueError::new_err(
+                "Received less than the minimum event size",
+            ));
+        }
+
+        let prealloc = if byte_cnt / 1024 > MIN_PREALLOC {
+            byte_cnt / 1024
+        } else {
+            MIN_PREALLOC
+        };
+        Ok(prealloc)
+    }
 
     const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
     /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte (Rust only)
