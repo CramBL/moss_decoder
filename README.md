@@ -10,6 +10,7 @@ Python module implemented in Rust for decoding raw data from the MOSS chip (Stit
   - [Installation](#installation)
     - [Example](#example)
   - [Motivation \& Purpose](#motivation--purpose)
+  - [MOSS event data packet protocol FSM](#moss-event-data-packet-protocol-fsm)
   - [@CERN Gitlab installation for CentOS and similar distributions from local build](#cern-gitlab-installation-for-centos-and-similar-distributions-from-local-build)
     - [Troubleshooting](#troubleshooting)
 
@@ -40,6 +41,40 @@ Decoding 10 MB MOSS readout data with 100k event data packets and ~2.7 million h
 | :----------------------------------------------- | -------------: | ------: | ------: | ------------: |
 | `python moss_test/util/decoder_native_python.py` | 36.319 ± 0.175 |  36.057 |  36.568 | 228.19 ± 2.70 |
 | `python moss_test/util/decoder_rust_package.py`  |  0.159 ± 0.002 |   0.157 |   0.165 |          1.00 |
+
+## MOSS event data packet protocol FSM
+
+```mermaid
+stateDiagram
+  frame_header : Unit Frame Header
+  frame_trailer : Unit Frame Trailer
+  region_header : Region Header
+  data_0 : Data 0
+  data_1 : Data 1
+  data_2 : Data 2
+  idle : Idle
+
+    [*] --> frame_header
+    
+    frame_header --> region_header
+
+    region_header --> region_header
+    region_header --> data_0
+
+    data_0 --> data_1
+    data_1 --> data_2
+
+    data_2 --> region_header
+    data_2 --> data_0
+    data_2 --> frame_trailer
+    data_2 --> idle
+
+    idle --> data_0
+    idle --> frame_trailer
+
+    frame_trailer --> [*]
+
+```
 
 ## @CERN Gitlab installation for CentOS and similar distributions from local build
 
