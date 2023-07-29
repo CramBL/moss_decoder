@@ -1,6 +1,6 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code, unused_imports)]
-
+//! Contains an FSM implementation of the MOSS data readout protocol
 sm::sm! {
 
     MossReadoutFSM {
@@ -54,6 +54,8 @@ use MossReadoutFSM::*;
 
 use crate::moss_protocol::MossWord;
 use crate::{MossHit, MossPacket};
+
+/// Struct that follows the FSM and maintains the state
 pub struct MossFsm {
     state_machine: MossReadoutFSM::Variant,
 }
@@ -145,6 +147,7 @@ impl MossFsm {
     }
 }
 
+/// Convenience function that takes a slice of [MossPacket]s, a DATA_0 byte and the current region ID and adds a new [MossHit] to the slice of [MossPacket]s
 #[inline]
 pub fn add_data0(moss_packets: &mut [MossPacket], data0: u8, current_region: u8) {
     moss_packets.last_mut().unwrap().hits.push(MossHit {
@@ -154,6 +157,7 @@ pub fn add_data0(moss_packets: &mut [MossPacket], data0: u8, current_region: u8)
     })
 }
 
+/// Convenience function that takes a slice of [MossPacket]s and a DATA_1 byte and adds the information it contains to the last hit
 #[inline]
 pub fn add_data1(moss_packets: &mut [MossPacket], data1: u8) {
     moss_packets
@@ -173,6 +177,7 @@ pub fn add_data1(moss_packets: &mut [MossPacket], data1: u8) {
         .column = ((data1 & 0x07) as u16) << 6;
 }
 
+/// Convenience function that takes a slice of [MossPacket]s and a DATA_2 byte and adds the information it contains to the last hit
 #[inline]
 pub fn add_data2(moss_packets: &mut [MossPacket], data2: u8) {
     moss_packets
