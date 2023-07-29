@@ -95,6 +95,10 @@ impl MossFsm {
                     st.transition(_WasRegionHeader).as_enum(),
                 ),
                 0..=0b0011_1111 => (MossWord::Data0, st.transition(_WasData0).as_enum()),
+                MossWord::UNIT_FRAME_TRAILER => (
+                    MossWord::UnitFrameTrailer,
+                    st.transition(_WasFrameTrailer).as_enum(),
+                ),
                 _ => unreachable!("GOT {byte:#X}"),
             },
             DATA0_By_WasData0(st) => (MossWord::Data1, st.transition(_WasData1).as_enum()),
