@@ -60,6 +60,7 @@ stateDiagram-v2
     frame_header --> region_header
 
     region_header --> region_header
+    region_header --> frame_trailer
     region_header --> DATA
 
     state DATA {
@@ -110,6 +111,7 @@ direction LR
 
     region_header --> region_header
     region_header --> DATA
+    region_header --> frame_trailer
 
     state DATA {
       direction LR
