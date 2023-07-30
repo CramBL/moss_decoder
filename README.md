@@ -1,5 +1,10 @@
 # MOSS Decoder
 [![CI](https://github.com/CramBL/moss_decoder/actions/workflows/CI.yml/badge.svg)](https://github.com/CramBL/moss_decoder/actions/workflows/CI.yml)
+![PyPI - Version](https://img.shields.io/pypi/v/moss-decoder)
+![PyPI - Wheel](https://img.shields.io/pypi/wheel/moss-decoder)
+![PyPI - Implementation](https://img.shields.io/pypi/implementation/moss-decoder)
+
+![GitHub language count](https://img.shields.io/github/languages/count/crambl/moss_decoder)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/moss-decoder)
 ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/crambl/moss_decoder)
 
