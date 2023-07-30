@@ -166,6 +166,27 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
     }
 }
 
+/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte with an FSM based decoder.
+/// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
+/// the call should be enclosed in a try/catch.
+#[pyfunction]
+pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
+    let byte_cnt = bytes.len();
+
+    if byte_cnt < 6 {
+        return Err(PyValueError::new_err(
+            "Received less than the minimum event size",
+        ));
+    }
+
+    let mut byte_iter = bytes.iter();
+
+    match moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+        Some(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
+        None => Err(PyAssertionError::new_err("No MOSS packet found")),
+    }
+}
+
 #[pyfunction]
 /// Decodes multiple MOSS events into a list of [MossPacket]s based on an FSM decoder.
 /// This function is optimized for speed and memory usage.
@@ -186,27 +207,6 @@ pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
     } else {
         let last_trailer_idx = byte_count - byte_iter.len() - 2;
         Ok((moss_packets, last_trailer_idx))
-    }
-}
-
-/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte with an FSM based decoder.
-/// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
-/// the call should be enclosed in a try/catch.
-#[pyfunction]
-pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
-    let byte_cnt = bytes.len();
-
-    if byte_cnt < 6 {
-        return Err(PyValueError::new_err(
-            "Received less than the minimum event size",
-        ));
-    }
-
-    let mut byte_iter = bytes.iter();
-
-    match moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
-        Some(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
-        None => Err(PyAssertionError::new_err("No MOSS packet found")),
     }
 }
 
