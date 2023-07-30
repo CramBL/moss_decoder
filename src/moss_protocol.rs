@@ -18,14 +18,14 @@ pub(crate) enum MossWord {
 }
 
 impl MossWord {
-    const IDLE: u8 = 0xFF; // 1111_1111 (default)
-    const UNIT_FRAME_HEADER: u8 = 0b1101_0000; // 1101_<unit_id[3:0]>
-    const UNIT_FRAME_TRAILER: u8 = 0b1110_0000; // 1110_0000
-    const REGION_HEADER: u8 = 0b1100_0000; // 1100_00_<region_id[1:0]>
-    const DATA_0: u8 = 0b0000_0000; // 00_<hit_row_pos[8:3]>
-    const DATA_1: u8 = 0b0100_0000; // 01_<hit_row_pos[2:0]>_<hit_col_pos[8:6]>
-    const DATA_2: u8 = 0b1000_0000; // 10_<hit_col_pos[5:0]>
-    const DELIMITER: u8 = 0xFA; // subject to change (FPGA implementation detail)
+    pub(super) const IDLE: u8 = 0xFF; // 1111_1111 (default)
+    pub(super) const UNIT_FRAME_HEADER: u8 = 0b1101_0000; // 1101_<unit_id[3:0]>
+    pub(super) const UNIT_FRAME_TRAILER: u8 = 0b1110_0000; // 1110_0000
+    pub(super) const REGION_HEADER: u8 = 0b1100_0000; // 1100_00_<region_id[1:0]>
+    pub(super) const DATA_0: u8 = 0b0000_0000; // 00_<hit_row_pos[8:3]>
+    pub(super) const DATA_1: u8 = 0b0100_0000; // 01_<hit_row_pos[2:0]>_<hit_col_pos[8:6]>
+    pub(super) const DATA_2: u8 = 0b1000_0000; // 10_<hit_col_pos[5:0]>
+    pub(super) const DELIMITER: u8 = 0xFA; // subject to change (FPGA implementation detail)
 
     pub fn from_byte(b: u8) -> MossWord {
         match b {
