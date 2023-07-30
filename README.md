@@ -184,7 +184,7 @@ stateDiagram-v2
 
 ```
 
-Decoding hits using the FSM above leads to higher performance and assures correct decoding by enforcing validating the state transitions.
+Decoding hits using the FSM above leads to higher performance and assures correct decoding by validating the state transitions.
 
 ## Motivation & Purpose
 Decoding in native Python is slow and the MOSS verification team at CERN got to a point where we needed more performance.
