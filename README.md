@@ -12,6 +12,8 @@ Python module implemented in Rust for decoding raw data from the MOSS chip (Stit
   - [Motivation \& Purpose](#motivation--purpose)
   - [MOSS event data packet protocol FSM](#moss-event-data-packet-protocol-fsm)
   - [Multiple event decoder FSM](#multiple-event-decoder-fsm)
+  - [Event data stream decoder FSM](#event-data-stream-decoder-fsm)
+  - [Event packet hit decoder FSM](#event-packet-hit-decoder-fsm)
   - [@CERN Gitlab installation for CentOS and similar distributions from local build](#cern-gitlab-installation-for-centos-and-similar-distributions-from-local-build)
     - [Troubleshooting](#troubleshooting)
 
@@ -136,6 +138,83 @@ direction LR
   EVENT --> delimiter
 
 ```
+## Event data stream decoder FSM
+```mermaid
+stateDiagram-v2
+direction LR
+  delimiter : Event Delimiter
+  frame_header : Unit Frame Header
+  frame_trailer : Unit Frame Trailer
+
+  
+  [*] --> delimiter
+  delimiter --> EVENT
+  delimiter --> delimiter
+
+  state EVENT {
+
+    [*] --> frame_header
+
+    frame_header --> HITS
+
+    state HITS {
+      [*] --> [*] : decode hits
+    }
+
+    HITS --> frame_trailer
+
+    frame_trailer --> [*]
+
+  }
+
+```
+
+## Event packet hit decoder FSM
+
+```mermaid
+stateDiagram-v2
+
+  region_header0 : Region Header 0
+  region_header1 : Region Header 1
+  region_header2 : Region Header 2
+  region_header3 : Region Header 3
+  data_0 : Data 0
+  data_1 : Data 1
+  data_2 : Data 2
+  idle : Idle
+
+  [*] --> region_header0
+  region_header0 --> region_header1
+  region_header0 --> DATA
+  DATA --> region_header1
+  region_header1 --> region_header2
+  region_header1 --> DATA
+  DATA --> region_header2
+  region_header2 --> region_header3
+  region_header2 --> DATA
+  DATA --> region_header3
+  region_header3 --> DATA
+  DATA --> [*]
+  region_header3 --> [*]
+
+  
+    state DATA {
+      direction LR
+      [*] --> data_0
+      data_0 --> data_1
+      data_1 --> data_2
+      data_2 --> data_0
+      data_2 --> idle
+      idle --> [*]
+      idle --> data_0
+      data_2 --> [*]
+
+    }
+
+```
+
+
+
 ## @CERN Gitlab installation for CentOS and similar distributions from local build
 
 If you update the package source code and want to build and install without publishing and fetching from PyPI, you can follow these steps.

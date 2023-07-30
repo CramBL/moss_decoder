@@ -52,7 +52,7 @@ def decode_multi_event(raw_bytes: bytes) -> tuple[list["MossPacket"], int]:
     returns a tuple of `list[MossPackets]` and an int that indicates the
     index where the last MOSS trailer was seen
     """
-    packets, last_trailer_idx = moss_decoder.decode_multiple_events_fsm(
+    packets, last_trailer_idx = moss_decoder.decode_multiple_events(
         raw_bytes)
 
     return packets, last_trailer_idx
