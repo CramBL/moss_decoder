@@ -47,18 +47,22 @@ def make_simple_moss_event_packet() -> bytes:
     return simple_packet
 
 
-def decode_multi_event(raw_bytes: bytes) -> tuple[list["MossPacket"], int]:
+def decode_multi_event(raw_bytes: bytes, fsm: bool = False) -> tuple[list["MossPacket"], int]:
     """Takes `bytes` and decodes it as `MossPacket`s.
     returns a tuple of `list[MossPackets]` and an int that indicates the
     index where the last MOSS trailer was seen
     """
-    packets, last_trailer_idx = moss_decoder.decode_multiple_events(
+    if fsm is True:
+        packets, last_trailer_idx = moss_decoder.decode_multiple_events_fsm(
+        raw_bytes)
+    else:
+        packets, last_trailer_idx = moss_decoder.decode_multiple_events(
         raw_bytes)
 
     return packets, last_trailer_idx
 
 
-def test_decode_multi_event():
+def test_decode_multi_event(fsm: bool = False):
     """Test that multiple events are correctly decoded from raw bytes"""
     print(
         (
@@ -72,7 +76,7 @@ def test_decode_multi_event():
 
     print(f"Read {byte_count} bytes")
 
-    packets, last_trailer_idx = decode_multi_event(raw_bytes=raw_bytes)
+    packets, last_trailer_idx = decode_multi_event(raw_bytes=raw_bytes, fsm=fsm)
 
     print(f"Decoded {len(packets)} packets")
 
@@ -220,6 +224,9 @@ if __name__ == "__main__":
 
     start = time.time()
     test_decode_multi_event()
+    print(f"Done in: {time.time()-start:.3f} s\n")
+    start = time.time()
+    test_decode_multi_event(fsm=True)
     print(f"Done in: {time.time()-start:.3f} s\n")
     start = time.time()
     test_moss_packet_print()
