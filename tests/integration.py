@@ -67,7 +67,7 @@ def test_decode_multi_event(fsm: bool = False):
     print(
         (
             "=== Test that multiple events"
-            "are correctly decoded from raw bytes ==="
+            " are correctly decoded from raw bytes ==="
         )
     )
     raw_bytes = read_bytes_from_file(FILE_PATH)
