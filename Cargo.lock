@@ -327,7 +327,7 @@ dependencies = [
 
 [[package]]
 name = "moss_decoder"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "criterion",
  "pretty_assertions",
