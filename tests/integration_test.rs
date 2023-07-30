@@ -268,3 +268,45 @@ fn test_decode_protocol_error() {
         }
     }
 }
+
+#[test]
+fn test_decode_from_file_func_fsm() {
+    let expect_packets = 100000;
+    let expect_hits = 2716940;
+
+    println!("Reading file...");
+    let time = std::time::Instant::now();
+
+    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    println!(
+        "Read file in: {t:?}. Bytes: {cnt}",
+        t = time.elapsed(),
+        cnt = f.len()
+    );
+
+    println!("Decoding content...");
+    let (p, last_trailer_idx) = decode_multiple_events_fsm_func(&f).unwrap();
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    println!("Got: {packets} packets", packets = p.len());
+    println!("Last trailer at index: {last_trailer_idx}");
+
+    assert_eq!(
+        last_trailer_idx,
+        f.len() - 2,
+        "All bytes were not processed!"
+    );
+    assert_eq!(
+        p.len(),
+        expect_packets,
+        "Expected 100k packets, got {}",
+        p.len()
+    );
+
+    // Count total hits
+    let total_hits = p.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, expect_hits,
+        "Expected {expect_hits} hits, got {total_hits}",
+    );
+}
