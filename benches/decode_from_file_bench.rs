@@ -13,6 +13,12 @@ pub fn decode_from_file(c: &mut Criterion) {
         group.bench_function("fsm", |b| {
             b.iter(|| moss_decoder::decode_multiple_events_fsm(&f))
         });
+        group.bench_function("fsm alternative", |b| {
+            b.iter(|| moss_decoder::decode_multiple_events_fsm_alt(&f))
+        });
+        group.bench_function("fsm functional", |b| {
+            b.iter(|| moss_decoder::decode_multiple_events_fsm_func(&f))
+        });
     }
     group.finish();
 }
