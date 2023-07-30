@@ -179,8 +179,10 @@ pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
         ));
     }
 
-    match rust_only::raw_decode_event_fsm(bytes) {
-        Ok((moss_packet, trailer_idx)) => Ok((moss_packet, trailer_idx)),
+    let mut byte_iter = bytes.iter();
+
+    match rust_only::raw_decode_event_fsm(&mut byte_iter) {
+        Ok(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
         Err(e) => Err(PyAssertionError::new_err(format!(
             "No MOSS packet found: {e}",
         ))),
@@ -228,16 +230,17 @@ pub fn decode_multiple_events_fsm_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>
 
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
 
-    let mut last_trailer_idx = 0;
+    let mut byte_iter = bytes.iter();
+    let byte_count = byte_iter.len();
 
-    while let Ok((moss_packet, trailer_idx)) = decode_event_fsm(&bytes[last_trailer_idx..]) {
+    while let Ok(moss_packet) = rust_only::raw_decode_event_fsm(&mut byte_iter) {
         moss_packets.push(moss_packet);
-        last_trailer_idx += trailer_idx + 1;
     }
 
     if moss_packets.is_empty() {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
+        let last_trailer_idx = byte_count - byte_iter.len() - 2;
         Ok((moss_packets, last_trailer_idx))
     }
 }
@@ -261,6 +264,27 @@ pub fn decode_multiple_events_fsm_func(bytes: &[u8]) -> PyResult<(Vec<MossPacket
     } else {
         let last_trailer_idx = byte_count - byte_iter.len() - 2;
         Ok((moss_packets, last_trailer_idx))
+    }
+}
+
+/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte with an FSM based decoder.
+/// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
+/// the call should be enclosed in a try/catch.
+#[pyfunction]
+pub fn decode_event_fsm_func(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
+    let byte_cnt = bytes.len();
+
+    if byte_cnt < 6 {
+        return Err(PyValueError::new_err(
+            "Received less than the minimum event size",
+        ));
+    }
+
+    let mut byte_iter = bytes.iter();
+
+    match moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+        Some(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
+        None => Err(PyAssertionError::new_err("No MOSS packet found")),
     }
 }
 
@@ -381,7 +405,9 @@ mod rust_only {
     }
 
     #[inline]
-    pub(crate) fn raw_decode_event_fsm(bytes: &[u8]) -> std::io::Result<(MossPacket, usize)> {
+    pub(crate) fn raw_decode_event_fsm<'a>(
+        bytes: &mut impl Iterator<Item = &'a u8>,
+    ) -> std::io::Result<MossPacket> {
         let mut moss_fsm = moss_protocol_fsm::MossFsm::new();
         let mut moss_packet = MossPacket {
             unit_id: INVALID_NO_HEADER_SEEN, // placeholder
@@ -389,10 +415,9 @@ mod rust_only {
         };
 
         let mut current_region: u8 = 0xFF; // Placeholder
-        let mut trailer_idx: usize = 0;
         let mut is_moss_packet = false;
 
-        for (i, byte) in bytes.iter().enumerate() {
+        for byte in bytes {
             match moss_fsm.advance(*byte) {
                 MossWord::UnitFrameHeader => {
                     debug_assert!(!is_moss_packet);
@@ -400,19 +425,14 @@ mod rust_only {
                     moss_packet.unit_id = *byte & 0x0F
                 }
                 MossWord::UnitFrameTrailer => {
-                    debug_assert!(
-                        is_moss_packet,
-                        "Trailer seen before header, next 10 bytes: {:#X?}",
-                        &bytes[i..i + 10]
-                    );
-                    trailer_idx = i;
+                    debug_assert!(is_moss_packet, "Trailer seen before header: {byte:#X}");
+
                     break;
                 }
                 MossWord::RegionHeader => {
                     debug_assert!(
                         is_moss_packet,
-                        "Region header seen before frame header at index {i}, current and next 9 bytes:\n {:#X?}",
-                    &bytes[i..i + 10]
+                        "Region header seen before frame header, current: {byte:#X}"
                     );
                     current_region = *byte & 0x03
                 }
@@ -439,9 +459,7 @@ mod rust_only {
                     };
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        format!(
-                        "Protocol error {describe_decode_state}, at index {i} with byte {byte:#X} "
-                    ),
+                        format!("Protocol error {describe_decode_state}, with byte {byte:#X} "),
                     ));
                 }
                 MossWord::Delimiter => debug_assert!(!is_moss_packet),
@@ -449,13 +467,13 @@ mod rust_only {
             }
         }
 
-        if moss_packet.unit_id == INVALID_NO_HEADER_SEEN || trailer_idx == 0 {
+        if moss_packet.unit_id == INVALID_NO_HEADER_SEEN {
             Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "No MOSS packet found",
             ))
         } else {
-            Ok((moss_packet, trailer_idx))
+            Ok(moss_packet)
         }
     }
 }

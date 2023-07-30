@@ -175,6 +175,49 @@ fn test_decoding_single_event() {
 }
 
 #[test]
+fn test_decoding_single_event_fsm() {
+    //
+    let event = fake_event_simple();
+
+    let (packet, last_trailer_idx) = decode_event_fsm(&event).unwrap();
+
+    assert!(
+        last_trailer_idx == event.len() - 1,
+        "All bytes were not processed!"
+    );
+
+    assert_eq!(
+        packet,
+        MossPacket {
+            unit_id: 0,
+            hits: vec![
+                MossHit {
+                    region: 0,
+                    row: 2,
+                    column: 8
+                },
+                MossHit {
+                    region: 0,
+                    row: 10,
+                    column: 8
+                },
+                MossHit {
+                    region: 1,
+                    row: 301,
+                    column: 433
+                },
+                MossHit {
+                    region: 3,
+                    row: 2,
+                    column: 8
+                },
+            ]
+        },
+        "unexpected decoding result"
+    );
+}
+
+#[test]
 fn test_decoding_multiple_events_one_call() {
     let events = fake_multiple_events();
 
