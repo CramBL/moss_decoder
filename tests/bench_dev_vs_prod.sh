@@ -9,10 +9,18 @@ measure_performance_prod
 
 println_magenta "*** Benchmark concluded ***\n"
 
+println_green "-- Default decoder --"
 println_blue "Benchmark of development build"
-cat dev-bench.md
-println_yellow "---------"
+println_bright_yellow "$( cat dev-bench.md )\n"
 
 println_cyan "Benchmark of production build"
-cat prod-bench.md
-println_yellow "---------"
+println_bright_yellow "$( cat prod-bench.md )\n"
+
+println_green "-- FSM decoder --"
+println_blue "Benchmark of development build"
+println_bright_yellow "$( cat dev-fsm-bench.md )\n"
+
+
+println_cyan "Benchmark of production build"
+println_bright_yellow "$( cat prod-fsm-bench.md )\n"
+
