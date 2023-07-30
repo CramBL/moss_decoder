@@ -210,6 +210,53 @@ pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
     }
 }
 
+#[pyfunction]
+/// Decodes a file containing raw MOSS data into a list of [MossPacket]s using an FSM based decoder.
+///
+/// The file is read in chunks of 10 MiB until the end of the file is reached.
+/// If any errors are encountered while reading the file, any successfully decoded events are returned.
+/// There's no attempt to run over errors.
+pub fn decode_from_file_fsm(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
+    // Open file (get file descriptor)
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(PyFileNotFoundError::new_err(e.to_string())),
+    };
+
+    // Create buffered reader with 1MB capacity to minimize syscalls to read
+    let mut reader = std::io::BufReader::with_capacity(READER_BUFFER_CAPACITY, file);
+
+    let mut moss_packets = Vec::new();
+
+    let mut buf = vec![0; READER_BUFFER_CAPACITY];
+    let mut bytes_to_decode = Vec::with_capacity(READER_BUFFER_CAPACITY);
+
+    while let Ok(bytes_read) = reader.read(&mut buf) {
+        if bytes_read == 0 {
+            break;
+        }
+
+        // Extend bytes_to_decode with the new data
+        bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
+
+        let mut byte_iter = bytes_to_decode.iter();
+
+        // Decode the bytes one event at a time until there's no more events to decode
+        while let Some(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+            moss_packets.push(moss_packet);
+        }
+
+        // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
+        bytes_to_decode = byte_iter.cloned().collect();
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok(moss_packets)
+    }
+}
+
 mod rust_only {
     use pyo3::exceptions::PyValueError;
     use pyo3::PyResult;
