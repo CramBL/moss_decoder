@@ -1,5 +1,7 @@
 use moss_decoder::*;
 
+use pretty_assertions::assert_eq;
+
 const IDLE: u8 = 0xFF;
 const UNIT_FRAME_TRAILER: u8 = 0xE0;
 const UNIT_FRAME_HEADER_0: u8 = 0xD0;
