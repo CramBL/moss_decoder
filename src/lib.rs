@@ -43,6 +43,7 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
 
     m.add_function(wrap_pyfunction!(decode_multiple_events_fsm, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_multiple_events_fsm_func, m)?)?;
 
     m.add_function(wrap_pyfunction!(decode_from_file, m)?)?;
 
@@ -166,29 +167,6 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
     }
 }
 
-/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte with an FSM based decoder.
-/// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
-/// the call should be enclosed in a try/catch.
-#[pyfunction]
-pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
-    let byte_cnt = bytes.len();
-
-    if byte_cnt < 6 {
-        return Err(PyValueError::new_err(
-            "Received less than the minimum event size",
-        ));
-    }
-
-    let mut byte_iter = bytes.iter();
-
-    match rust_only::raw_decode_event_fsm(&mut byte_iter) {
-        Ok(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
-        Err(e) => Err(PyAssertionError::new_err(format!(
-            "No MOSS packet found: {e}",
-        ))),
-    }
-}
-
 /// Decodes multiple MOSS events into a list of [MossPacket]s based on an FSM decoder.
 /// This function is optimized for speed and memory usage.
 #[pyfunction]
@@ -225,28 +203,6 @@ pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
 
 #[pyfunction]
 /// Alternative
-pub fn decode_multiple_events_fsm_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
-    let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
-
-    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
-
-    let mut byte_iter = bytes.iter();
-    let byte_count = byte_iter.len();
-
-    while let Ok(moss_packet) = rust_only::raw_decode_event_fsm(&mut byte_iter) {
-        moss_packets.push(moss_packet);
-    }
-
-    if moss_packets.is_empty() {
-        Err(PyAssertionError::new_err("No MOSS Packets in events"))
-    } else {
-        let last_trailer_idx = byte_count - byte_iter.len() - 2;
-        Ok((moss_packets, last_trailer_idx))
-    }
-}
-
-#[pyfunction]
-/// Alternative
 pub fn decode_multiple_events_fsm_func(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
     let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
 
@@ -271,7 +227,7 @@ pub fn decode_multiple_events_fsm_func(bytes: &[u8]) -> PyResult<(Vec<MossPacket
 /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
 /// the call should be enclosed in a try/catch.
 #[pyfunction]
-pub fn decode_event_fsm_func(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
+pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     let byte_cnt = bytes.len();
 
     if byte_cnt < 6 {
@@ -291,8 +247,6 @@ pub fn decode_event_fsm_func(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
 mod rust_only {
     use pyo3::exceptions::PyValueError;
     use pyo3::PyResult;
-
-    use crate::moss_protocol_fsm;
 
     /// Functions that are only used in Rust and not exposed to Python.
     use super::MossHit;
@@ -401,6 +355,64 @@ mod rust_only {
             ))
         } else {
             Ok((moss_packet, trailer_idx))
+        }
+    }
+}
+
+pub mod slower_impls {
+    //! Kept for benchmarks and potential verification (not just decoding) in the future.
+
+    const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
+
+    use pyo3::{
+        exceptions::{PyAssertionError, PyValueError},
+        pyfunction, PyResult,
+    };
+
+    use crate::{moss_protocol::MossWord, moss_protocol_fsm, rust_only, MossHit, MossPacket};
+
+    /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte with an FSM based decoder.
+    /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
+    /// the call should be enclosed in a try/catch.
+    #[pyfunction]
+    pub fn decode_event_fsm_alt(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
+        let byte_cnt = bytes.len();
+
+        if byte_cnt < 6 {
+            return Err(PyValueError::new_err(
+                "Received less than the minimum event size",
+            ));
+        }
+
+        let mut byte_iter = bytes.iter();
+
+        match raw_decode_event_fsm(&mut byte_iter) {
+            Ok(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
+            Err(e) => Err(PyAssertionError::new_err(format!(
+                "No MOSS packet found: {e}",
+            ))),
+        }
+    }
+
+    #[pyfunction]
+    /// Alternative
+    pub fn decode_multiple_events_fsm_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
+        let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
+
+        let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
+
+        let mut byte_iter = bytes.iter();
+        let byte_count = byte_iter.len();
+
+        while let Ok(moss_packet) = raw_decode_event_fsm(&mut byte_iter) {
+            moss_packets.push(moss_packet);
+        }
+
+        if moss_packets.is_empty() {
+            Err(PyAssertionError::new_err("No MOSS Packets in events"))
+        } else {
+            let last_trailer_idx = byte_count - byte_iter.len() - 2;
+            Ok((moss_packets, last_trailer_idx))
         }
     }
 
