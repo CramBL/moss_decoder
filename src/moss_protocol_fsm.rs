@@ -252,7 +252,6 @@ mod tests {
 
     #[test]
     fn test_fsm() {
-        //
         let mut event_data_packet = fake_event_simple();
         event_data_packet.append(&mut fake_event_simple());
         let mut moss_fsm = MossFsm::new();
