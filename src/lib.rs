@@ -31,6 +31,7 @@ pub mod moss_protocol;
 pub use moss_protocol::MossHit;
 use moss_protocol::MossWord;
 pub mod moss_protocol_fsm;
+pub mod moss_protocol_nested_fsm;
 
 /// A Python module for decoding raw MOSS data in Rust.
 #[pymodule]
@@ -237,6 +238,28 @@ pub fn decode_multiple_events_fsm_alt(bytes: &[u8]) -> PyResult<(Vec<MossPacket>
     if moss_packets.is_empty() {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
+        Ok((moss_packets, last_trailer_idx))
+    }
+}
+
+#[pyfunction]
+/// Alternative
+pub fn decode_multiple_events_fsm_func(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
+    let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
+
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
+
+    let mut byte_iter = bytes.iter();
+    let byte_count = byte_iter.len();
+
+    while let Some(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+        moss_packets.push(moss_packet);
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        let last_trailer_idx = byte_count - byte_iter.len() - 1;
         Ok((moss_packets, last_trailer_idx))
     }
 }
