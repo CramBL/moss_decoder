@@ -219,6 +219,10 @@ if __name__ == "__main__":
             # Just run this and then exit
             test_decode_multi_event()
             sys.exit(0)
+        elif args[1] == "benchmark-fsm":
+            # Just run this and then exit
+            test_decode_multi_event(fsm=True)
+            sys.exit(0)
 
     test_fundamental_class_comparisons()
 
