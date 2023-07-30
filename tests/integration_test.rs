@@ -330,7 +330,7 @@ fn test_decode_from_file_func_fsm() {
     );
 
     println!("Decoding content...");
-    let (p, last_trailer_idx) = decode_multiple_events_fsm_func(&f).unwrap();
+    let (p, last_trailer_idx) = decode_multiple_events_fsm(&f).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets} packets", packets = p.len());

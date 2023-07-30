@@ -42,7 +42,7 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
 
-    m.add_function(wrap_pyfunction!(decode_multiple_events_fsm_func, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_multiple_events_fsm, m)?)?;
 
     m.add_function(wrap_pyfunction!(decode_from_file, m)?)?;
 
@@ -169,7 +169,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 #[pyfunction]
 /// Decodes multiple MOSS events into a list of [MossPacket]s based on an FSM decoder.
 /// This function is optimized for speed and memory usage.
-pub fn decode_multiple_events_fsm_func(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
+pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
     let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
 
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
