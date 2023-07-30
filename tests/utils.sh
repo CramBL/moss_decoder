@@ -2,6 +2,7 @@
 
 export SCRIPT_PATH="tests/integration.py"
 export BENCH_CMD="python ${SCRIPT_PATH} benchmark"
+export BENCH_CMD_FSM="python ${SCRIPT_PATH} benchmark-fsm"
 
 export TXT_CLEAR="\e[0m"
 

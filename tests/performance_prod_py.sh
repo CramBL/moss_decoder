@@ -24,6 +24,7 @@ function measure_performance_dev {
 
     cargo install hyperfine --locked
 
+    # Run benchmark
     hyperfine \
         "${BENCH_CMD}"\
         --warmup 3\
@@ -31,6 +32,15 @@ function measure_performance_dev {
         --time-unit millisecond\
         --shell=bash\
         --export-markdown prod-bench.md
+
+    # Run benchmark with FSM decoder
+    hyperfine \
+        "${BENCH_CMD_FSM}"\
+        --warmup 3\
+        --style full\
+        --time-unit millisecond\
+        --shell=bash\
+        --export-markdown prod-fsm-bench.md
 }
 
 if [[ $# -eq 0 ]] ; then
