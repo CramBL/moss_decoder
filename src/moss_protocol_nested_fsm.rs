@@ -1,8 +1,12 @@
 //! Contains an FSM implementation of the MOSS data readout protocol
 #![allow(non_camel_case_types)]
 
+use crate::moss_protocol::MossWord;
+use crate::MossHit;
 use crate::MossPacket;
 
+/// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
+/// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
 #[inline]
 pub(crate) fn extract_packet<'a>(
     mut bytes: &mut impl Iterator<Item = &'a u8>,
@@ -71,8 +75,6 @@ sm::sm! {
     }
 }
 
-use crate::moss_protocol::MossWord;
-use crate::MossHit;
 use MossDataFSM::Variant::*;
 use MossDataFSM::*;
 
@@ -81,6 +83,9 @@ const REGION_HEADER1: u8 = 0xC1;
 const REGION_HEADER2: u8 = 0xC2;
 const REGION_HEADER3: u8 = 0xC3;
 
+/// Take an iterator that should be advanced to the position after a unit frame header.
+/// Advances the iterator and decodes any observed hits until a Unit Frame Trailer is encountered at which point the iteration stops.
+/// Returns all the decoded [MossHit]s if any.
 #[inline]
 pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Option<Vec<MossHit>> {
     let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
