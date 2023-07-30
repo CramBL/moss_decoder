@@ -86,6 +86,8 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
     let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
     let mut hits = Vec::<MossHit>::new();
 
+    let mut current_region = 0xff;
+
     for b in bytes {
         sm = match sm {
             Initial_REGION_HEADER0_(st) => match *b {
@@ -93,9 +95,13 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                 _ => unreachable!("Expected Region Header 0, got: {b:#X}"),
             },
             _REGION_HEADER0_By_RegionHeader0(st) => match *b {
-                REGION_HEADER1 => st.transition(_RegionHeader1).as_enum(),
+                REGION_HEADER1 => {
+                    current_region = 1;
+                    st.transition(_RegionHeader1).as_enum()
+                }
                 0..=0b0011_1111 => {
-                    add_data0(&mut hits, *b, 0);
+                    current_region = 0;
+                    add_data0(&mut hits, *b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Region Header 1 or DATA 0, got: {b:#X}"),
@@ -110,13 +116,22 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
             }
             DATA2_By_Data(st) => match *b {
                 0..=0b0011_1111 => {
-                    add_data0(&mut hits, *b, 0);
+                    add_data0(&mut hits, *b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 MossWord::IDLE => st.transition(_Idle).as_enum(),
-                REGION_HEADER1 => st.transition(_RegionHeader1).as_enum(),
-                REGION_HEADER2 => st.transition(_RegionHeader2).as_enum(),
-                REGION_HEADER3 => st.transition(_RegionHeader3).as_enum(),
+                REGION_HEADER1 => {
+                    current_region = 1;
+                    st.transition(_RegionHeader1).as_enum()
+                }
+                REGION_HEADER2 => {
+                    current_region = 2;
+                    st.transition(_RegionHeader2).as_enum()
+                }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
+                }
                 MossWord::UNIT_FRAME_TRAILER => break,
 
                 _ => {
@@ -128,9 +143,18 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                     add_data0(&mut hits, *b, 0);
                     st.transition(_Data).as_enum()
                 }
-                REGION_HEADER1 => st.transition(_RegionHeader1).as_enum(),
-                REGION_HEADER2 => st.transition(_RegionHeader2).as_enum(),
-                REGION_HEADER3 => st.transition(_RegionHeader3).as_enum(),
+                REGION_HEADER1 => {
+                    current_region = 1;
+                    st.transition(_RegionHeader1).as_enum()
+                }
+                REGION_HEADER2 => {
+                    current_region = 2;
+                    st.transition(_RegionHeader2).as_enum()
+                }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
+                }
                 MossWord::UNIT_FRAME_TRAILER => break,
 
                 _ => {
@@ -138,17 +162,25 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                 }
             },
             REGION_HEADER1_By_RegionHeader1(st) => match *b {
-                REGION_HEADER2 => st.transition(_RegionHeader2).as_enum(),
+                REGION_HEADER2 => {
+                    current_region = 2;
+                    st.transition(_RegionHeader2).as_enum()
+                }
                 0..=0b0011_1111 => {
-                    add_data0(&mut hits, *b, 0);
+                    current_region = 1;
+                    add_data0(&mut hits, *b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Region Header 2 or DATA 0, got: {b:#X}"),
             },
             REGION_HEADER2_By_RegionHeader2(st) => match *b {
-                REGION_HEADER3 => st.transition(_RegionHeader3).as_enum(),
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
+                }
                 0..=0b0011_1111 => {
-                    add_data0(&mut hits, *b, 0);
+                    current_region = 2;
+                    add_data0(&mut hits, *b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Region Header 3 or DATA 0, got: {b:#X}"),
@@ -156,7 +188,8 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
             REGION_HEADER3_By_RegionHeader3(st) => match *b {
                 MossWord::UNIT_FRAME_TRAILER => break,
                 0..=0b0011_1111 => {
-                    add_data0(&mut hits, *b, 0);
+                    current_region = 3;
+                    add_data0(&mut hits, *b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Unit Frame Trailer or DATA 0, got: {b:#X}"),
