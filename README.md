@@ -9,6 +9,8 @@ Python module implemented in Rust for high-performance decoding of readout data 
 - [MOSS Decoder](#moss-decoder)
   - [Installation](#installation)
     - [Example](#example)
+  - [Features](#features)
+    - [3 types of functions are provided](#3-types-of-functions-are-provided)
   - [MOSS event data packet protocol FSM](#moss-event-data-packet-protocol-fsm)
   - [MOSS event data packet decoder FSM](#moss-event-data-packet-decoder-fsm)
   - [Event packet hit decoder FSM](#event-packet-hit-decoder-fsm)
@@ -32,6 +34,36 @@ print(moss_packet[0])
 print(moss_packet[0].hits[0])
 # reg: 0 row: 3 col: 11
 ```
+
+## Features
+See [python types](moss_decoder.pyi) for the type information the package exposes to Python.
+
+Two classes are provided: `MossPacket` & `MossHit`.
+
+### 3 types of functions are provided
+```python
+decode_event(arg: bytes)  -> tuple[MossPacket, int]: ...
+# allows decoding a single event from an iterable of bytes
+``` 
+
+**Returns**: the decoded `MossPacket` and the index the *unit frame trailer* was found. Throws if no valid `MossPacket` is found.
+```python 
+decode_multiple_events(arg: bytes) -> tuple[list[MossPacket], int]: ...
+# returns as many `MossPacket`s as can be decoded from the bytes iterable. 
+# This is much more effecient than calling `decode_event` multiple times. 
+``` 
+**Returns**: A list of `MossPacket`s and the index of the last observed *unit frame trailer*. Throws if no valid `MossPacket`s are found.
+
+```python 
+decode_from_file(arg: str | Path) -> list[MossPacket]: ...
+# takes a `Path` and returns as many `MossPacket` as can be decoded from file. 
+# This is the most effecient way of decoding data from a file.
+``` 
+**Returns**: A list of `MossPacket`s. Throws if the file is not found or no valid `MossPacket`s are found.
+
+
+Each function has a variant with a `_fsm`-suffix that uses an FSM based decoder, which is both faster and validates state transitions in the MOSS protocol. 
+
 ## MOSS event data packet protocol FSM
 The a MOSS half-unit event data packet follows the states seen in the FSM below. The region header state is simplified here.
 ```mermaid
