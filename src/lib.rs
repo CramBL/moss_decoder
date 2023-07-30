@@ -259,7 +259,7 @@ pub fn decode_multiple_events_fsm_func(bytes: &[u8]) -> PyResult<(Vec<MossPacket
     if moss_packets.is_empty() {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
-        let last_trailer_idx = byte_count - byte_iter.len() - 1;
+        let last_trailer_idx = byte_count - byte_iter.len() - 2;
         Ok((moss_packets, last_trailer_idx))
     }
 }
