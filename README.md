@@ -4,7 +4,7 @@
 ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/crambl/moss_decoder)
 
 
-Python module implemented in Rust for high-performance decoding of readout data from the MOSS chip (Stitched Monolithic Pixel Sensor prototype).
+Python package implemented in Rust for high-performance decoding of readout data from the MOSS chip (Stitched Monolithic Pixel Sensor prototype).
 
 - [MOSS Decoder](#moss-decoder)
   - [Installation](#installation)
