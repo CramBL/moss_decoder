@@ -4,16 +4,15 @@
 ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/m/crambl/moss_decoder)
 
 
-Python module implemented in Rust for decoding raw data from the MOSS chip (Stitched Monolithic Pixel Sensor prototype).
+Python module implemented in Rust for high-performance decoding of readout data from the MOSS chip (Stitched Monolithic Pixel Sensor prototype).
 
 - [MOSS Decoder](#moss-decoder)
   - [Installation](#installation)
     - [Example](#example)
-  - [Motivation \& Purpose](#motivation--purpose)
   - [MOSS event data packet protocol FSM](#moss-event-data-packet-protocol-fsm)
-  - [Multiple event decoder FSM](#multiple-event-decoder-fsm)
-  - [Event data stream decoder FSM](#event-data-stream-decoder-fsm)
+  - [MOSS event data packet decoder FSM](#moss-event-data-packet-decoder-fsm)
   - [Event packet hit decoder FSM](#event-packet-hit-decoder-fsm)
+  - [Motivation \& Purpose](#motivation--purpose)
   - [@CERN Gitlab installation for CentOS and similar distributions from local build](#cern-gitlab-installation-for-centos-and-similar-distributions-from-local-build)
     - [Troubleshooting](#troubleshooting)
 
@@ -33,20 +32,8 @@ print(moss_packet[0])
 print(moss_packet[0].hits[0])
 # reg: 0 row: 3 col: 11
 ```
-## Motivation & Purpose
-Decoding in native Python is slow and the MOSS verification team at CERN got to a point where we needed more performance.
-
-Earliest version of a Rust package gave massive improvements as shown in the benchmark below.
-
-Decoding 10 MB MOSS readout data with 100k event data packets and ~2.7 million hits. Performed on CentOS Stream 9 with Python 3.11
-
-| Command                                          |       Mean [s] | Min [s] | Max [s] |      Relative |
-| :----------------------------------------------- | -------------: | ------: | ------: | ------------: |
-| `python moss_test/util/decoder_native_python.py` | 36.319 ± 0.175 |  36.057 |  36.568 | 228.19 ± 2.70 |
-| `python moss_test/util/decoder_rust_package.py`  |  0.159 ± 0.002 |   0.157 |   0.165 |          1.00 |
-
 ## MOSS event data packet protocol FSM
-
+The a MOSS half-unit event data packet follows the states seen in the FSM below. The region header state is simplified here.
 ```mermaid
 stateDiagram-v2
   frame_header : Unit Frame Header
@@ -86,59 +73,10 @@ stateDiagram-v2
 
 ```
 
-## Multiple event decoder FSM
-If the decoder is decoding data containing multiple events, the following FSM is used.
+## MOSS event data packet decoder FSM
+The FSM based decoder uses the following FSM.
 The `delimiter` is expected to be `0xFA`. The default `Idle` value `0xFF` is also assumed.
-```mermaid
-stateDiagram-v2
-direction LR
-  delimiter : Event Delimiter
-  frame_header : Unit Frame Header
-  frame_trailer : Unit Frame Trailer
-  region_header : Region Header
-  data_0 : Data 0
-  data_1 : Data 1
-  data_2 : Data 2
-  idle : Idle
 
-  [*] --> delimiter
-  delimiter --> EVENT
-  delimiter --> delimiter
-
-  state EVENT {
-
-    [*] --> frame_header
-    
-    frame_header --> region_header
-
-    region_header --> region_header
-    region_header --> DATA
-    region_header --> frame_trailer
-
-    state DATA {
-      direction LR
-      [*] --> data_0
-      data_0 --> data_1
-      data_1 --> data_2
-      data_2 --> data_0
-      data_2 --> [*]
-
-    }
-    
-    DATA --> region_header
-    DATA --> frame_trailer
-    DATA --> idle
-
-
-    idle --> DATA
-    idle --> frame_trailer
-
-    frame_trailer --> [*]
-  }
-  EVENT --> delimiter
-
-```
-## Event data stream decoder FSM
 ```mermaid
 stateDiagram-v2
 direction LR
@@ -168,6 +106,7 @@ direction LR
   }
 
 ```
+Decoding hits takes place with the FSM in the next section.
 
 ## Event packet hit decoder FSM
 
@@ -213,7 +152,19 @@ stateDiagram-v2
 
 ```
 
+Decoding hits using the FSM above leads to higher performance and assures correct decoding by enforcing validating the state transitions.
 
+## Motivation & Purpose
+Decoding in native Python is slow and the MOSS verification team at CERN got to a point where we needed more performance.
+
+Earliest version of a Rust package gave massive improvements as shown in the benchmark below.
+
+Decoding 10 MB MOSS readout data with 100k event data packets and ~2.7 million hits. Performed on CentOS Stream 9 with Python 3.11
+
+| Command                                          |       Mean [s] | Min [s] | Max [s] |      Relative |
+| :----------------------------------------------- | -------------: | ------: | ------: | ------------: |
+| `python moss_test/util/decoder_native_python.py` | 36.319 ± 0.175 |  36.057 |  36.568 | 228.19 ± 2.70 |
+| `python moss_test/util/decoder_rust_package.py`  |  0.159 ± 0.002 |   0.157 |   0.165 |          1.00 |
 
 ## @CERN Gitlab installation for CentOS and similar distributions from local build
 
