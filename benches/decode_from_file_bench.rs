@@ -11,7 +11,7 @@ pub fn decode_from_file(c: &mut Criterion) {
             b.iter(|| moss_decoder::decode_multiple_events(&f))
         });
         group.bench_function("fsm", |b| {
-            b.iter(|| moss_decoder::decode_multiple_events_fsm(&f))
+            b.iter(|| moss_decoder::slower_impls::decode_multiple_events_fsm(&f))
         });
         group.bench_function("fsm alternative", |b| {
             b.iter(|| moss_decoder::slower_impls::decode_multiple_events_fsm_alt(&f))

@@ -306,7 +306,7 @@ mod tests {
         );
 
         println!("Decoding content...");
-        let (p, last_trailer_idx) = crate::decode_multiple_events_fsm(&f).unwrap();
+        let (p, last_trailer_idx) = crate::slower_impls::decode_multiple_events_fsm(&f).unwrap();
         println!("Decoded in: {t:?}\n", t = time.elapsed());
 
         println!("Got: {packets} packets", packets = p.len());
