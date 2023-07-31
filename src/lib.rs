@@ -184,8 +184,10 @@ pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     let mut byte_iter = bytes.iter();
 
     match moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
-        Some(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
-        None => Err(PyAssertionError::new_err("No MOSS packet found")),
+        Ok(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
+        Err(e) => Err(PyAssertionError::new_err(format!(
+            "Decoding failed with: {e}",
+        ))),
     }
 }
 
@@ -200,7 +202,7 @@ pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
     let mut byte_iter = bytes.iter();
     let byte_count = byte_iter.len();
 
-    while let Some(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+    while let Ok(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
         moss_packets.push(moss_packet);
     }
 
@@ -244,7 +246,7 @@ pub fn decode_from_file_fsm(path: std::path::PathBuf) -> PyResult<Vec<MossPacket
         let mut byte_iter = bytes_to_decode.iter();
 
         // Decode the bytes one event at a time until there's no more events to decode
-        while let Some(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+        while let Ok(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
             moss_packets.push(moss_packet);
         }
 

@@ -10,7 +10,7 @@ use crate::MossPacket;
 #[inline]
 pub(crate) fn extract_packet<'a>(
     mut bytes: &mut impl Iterator<Item = &'a u8>,
-) -> Option<MossPacket> {
+) -> Result<MossPacket, Box<str>> {
     let mut unit_id: Option<u8> = None;
     for b in &mut bytes {
         if MossWord::UNIT_FRAME_HEADER_RANGE.contains(b) {
@@ -19,10 +19,14 @@ pub(crate) fn extract_packet<'a>(
         }
     }
 
-    unit_id.map(|unit_id| MossPacket {
-        unit_id,
-        hits: extract_hits(bytes).unwrap_or_else(|| Vec::with_capacity(0)),
-    })
+    if let Some(unit_id) = unit_id {
+        Ok(MossPacket {
+            unit_id,
+            hits: extract_hits(bytes)?,
+        })
+    } else {
+        Err("No Unit Frame Header found".into())
+    }
 }
 
 sm::sm! {
@@ -87,7 +91,9 @@ const REGION_HEADER3: u8 = 0xC3;
 /// Advances the iterator and decodes any observed hits until a Unit Frame Trailer is encountered at which point the iteration stops.
 /// Returns all the decoded [MossHit]s if any.
 #[inline]
-pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Option<Vec<MossHit>> {
+pub(crate) fn extract_hits<'a>(
+    bytes: &mut impl Iterator<Item = &'a u8>,
+) -> Result<Vec<MossHit>, Box<str>> {
     let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
     let mut hits = Vec::<MossHit>::new();
 
@@ -112,8 +118,12 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                 _ => unreachable!("Expected Region Header 1 or DATA 0, got: {b:#X}"),
             },
             DATA0_By_Data(st) => {
-                add_data1(&mut hits, *b);
-                st.transition(_Data).as_enum()
+                if MossWord::DATA_1_RANGE.contains(b) {
+                    add_data1(&mut hits, *b);
+                    st.transition(_Data).as_enum()
+                } else {
+                    return Err("Expected DATA 1, got: {b:#X}".into());
+                }
             }
             DATA1_By_Data(st) => {
                 add_data2(&mut hits, *b);
@@ -206,9 +216,9 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
     }
 
     if hits.is_empty() {
-        None
+        Ok(Vec::with_capacity(0))
     } else {
-        Some(hits)
+        Ok(hits)
     }
 }
 
@@ -263,7 +273,7 @@ mod tests {
             }
         };
 
-        if let Some(hits) = extract_hits(&mut byte_iter) {
+        if let Ok(hits) = extract_hits(&mut byte_iter) {
             assert_eq!(unit_id, 1);
             assert_eq!(hits.len(), 4);
             assert_eq!(byte_count - byte_iter.len() - 1, 18);
@@ -290,7 +300,7 @@ mod tests {
             }
         };
 
-        if let Some(hits) = extract_hits(&mut byte_iter) {
+        if let Ok(hits) = extract_hits(&mut byte_iter) {
             assert_eq!(unit_id, 1);
             assert_eq!(hits.len(), 4);
             assert_eq!(byte_count - byte_iter.len() - 1, 18);
@@ -306,7 +316,7 @@ mod tests {
             }
         };
 
-        if let Some(hits) = extract_hits(&mut byte_iter) {
+        if let Ok(hits) = extract_hits(&mut byte_iter) {
             assert_eq!(unit_id, 1);
             assert_eq!(hits.len(), 4);
             assert_eq!(byte_count - byte_iter.len() - 1, 37);
@@ -322,7 +332,21 @@ mod tests {
         let mut packet_iter = slice.iter();
         let p = extract_packet(&mut packet_iter);
         println!("{p:?}");
-        assert!(p.is_some());
+        assert!(p.is_ok());
         assert_eq!(p.unwrap().hits.len(), 4);
+    }
+
+    #[test]
+    fn test_protocol_error() {
+        //pyo3::prepare_freethreaded_python();
+        let packet = fake_event_protocol_error();
+        let slice = packet.as_slice();
+        let mut packet_iter = slice.iter();
+        let p = extract_packet(&mut packet_iter);
+        if let Err(e) = p {
+            println!("{e:?}");
+        } else {
+            panic!("Expected error, got OK")
+        }
     }
 }
