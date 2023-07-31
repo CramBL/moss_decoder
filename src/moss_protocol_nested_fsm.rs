@@ -8,22 +8,22 @@ use crate::MossPacket;
 /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
 /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
 #[inline]
-pub(crate) fn extract_packet<'a>(
-    mut bytes: &mut impl Iterator<Item = &'a u8>,
-) -> Result<MossPacket, Box<str>> {
-    let mut unit_id: Option<u8> = None;
-    for b in &mut bytes {
-        if MossWord::UNIT_FRAME_HEADER_RANGE.contains(b) {
-            unit_id = Some(b & 0xF);
-            break;
+pub(crate) fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), Box<str>> {
+    if let Some(header_idx) = bytes
+        .iter()
+        .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
+    {
+        let mut bytes_iter = bytes.iter().skip(header_idx + 1);
+        match extract_hits(&mut bytes_iter) {
+            Ok(hits) => Ok((
+                MossPacket {
+                    unit_id: bytes[header_idx] & 0xF,
+                    hits,
+                },
+                bytes.len() - bytes_iter.len() - 1,
+            )),
+            Err(e) => Err(e),
         }
-    }
-
-    if let Some(unit_id) = unit_id {
-        Ok(MossPacket {
-            unit_id,
-            hits: extract_hits(bytes)?,
-        })
     } else {
         Err("No Unit Frame Header found".into())
     }
@@ -87,19 +87,38 @@ const REGION_HEADER1: u8 = 0xC1;
 const REGION_HEADER2: u8 = 0xC2;
 const REGION_HEADER3: u8 = 0xC3;
 
+fn format_error_msg<'a>(
+    err_b: u8,
+    bytes: impl Iterator<Item = &'a u8> + std::iter::DoubleEndedIterator + std::iter::ExactSizeIterator,
+    valid: &str,
+) -> Box<str> {
+    // Get the previous 10 and the next 10 bytes
+
+    let next = bytes.copied().take(10).collect::<Vec<_>>();
+
+    format!(
+        "Expected {valid}, got: {err_b:#X} | {err_b:#X} <-- {next_bytes:X?}",
+        err_b = err_b,
+        next_bytes = next,
+    )
+    .into_boxed_str()
+}
+
 /// Take an iterator that should be advanced to the position after a unit frame header.
 /// Advances the iterator and decodes any observed hits until a Unit Frame Trailer is encountered at which point the iteration stops.
 /// Returns all the decoded [MossHit]s if any.
 #[inline]
 pub(crate) fn extract_hits<'a>(
-    bytes: &mut impl Iterator<Item = &'a u8>,
+    bytes: &mut (impl Iterator<Item = &'a u8>
+              + std::iter::DoubleEndedIterator
+              + std::iter::ExactSizeIterator),
 ) -> Result<Vec<MossHit>, Box<str>> {
     let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
     let mut hits = Vec::<MossHit>::new();
 
     let mut current_region = 0xff;
 
-    for b in bytes {
+    for (i, b) in bytes.enumerate() {
         sm = match sm {
             Initial_REGION_HEADER0_(st) => match *b {
                 REGION_HEADER0 => st.transition(_RegionHeader0).as_enum(),
@@ -115,14 +134,14 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => unreachable!("Expected Region Header 1 or DATA 0, got: {b:#X}"),
+                _ => unreachable!("Valid: REGION_HEADER_1/DATA_0, got: {b:#X}"),
             },
             DATA0_By_Data(st) => {
                 if MossWord::DATA_1_RANGE.contains(b) {
                     add_data1(&mut hits, *b);
                     st.transition(_Data).as_enum()
                 } else {
-                    return Err("Expected DATA 1, got: {b:#X}".into());
+                    return Err(format_error_msg(*b, bytes, "DATA_1"));
                 }
             }
             DATA1_By_Data(st) => {
@@ -328,22 +347,20 @@ mod tests {
     #[test]
     fn test_extract_packet() {
         let packet = fake_event_simple();
-        let slice = packet.as_slice();
-        let mut packet_iter = slice.iter();
-        let p = extract_packet(&mut packet_iter);
+        let p = extract_packet(&packet);
         println!("{p:?}");
         assert!(p.is_ok());
-        assert_eq!(p.unwrap().hits.len(), 4);
+        let (p, trailer_idx) = p.unwrap();
+        assert_eq!(p.hits.len(), 4);
+        assert_eq!(trailer_idx, 18);
     }
 
     #[test]
     fn test_protocol_error() {
         //pyo3::prepare_freethreaded_python();
         let packet = fake_event_protocol_error();
-        let slice = packet.as_slice();
-        let mut packet_iter = slice.iter();
-        let p = extract_packet(&mut packet_iter);
-        if let Err(e) = p {
+
+        if let Err(e) = extract_packet(&packet) {
             println!("{e:?}");
         } else {
             panic!("Expected error, got OK")

@@ -139,7 +139,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
     let mut buf = vec![0; READER_BUFFER_CAPACITY];
     let mut bytes_to_decode = Vec::with_capacity(READER_BUFFER_CAPACITY);
 
-    while let Ok(bytes_read) = reader.read(&mut buf[..]) {
+    while let Ok(bytes_read) = reader.read(&mut buf) {
         if bytes_read == 0 {
             break;
         }
@@ -181,10 +181,8 @@ pub fn decode_event_fsm(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
         ));
     }
 
-    let mut byte_iter = bytes.iter();
-
-    match moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
-        Ok(moss_packet) => Ok((moss_packet, byte_cnt - byte_iter.len() - 1)),
+    match moss_protocol_nested_fsm::extract_packet(bytes) {
+        Ok((moss_packet, trailer_idx)) => Ok((moss_packet, trailer_idx)),
         Err(e) => Err(PyAssertionError::new_err(format!(
             "Decoding failed with: {e}",
         ))),
@@ -199,18 +197,19 @@ pub fn decode_multiple_events_fsm(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, us
 
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
 
-    let mut byte_iter = bytes.iter();
-    let byte_count = byte_iter.len();
+    let mut last_trailer_idx = 0;
 
-    while let Ok(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+    while let Ok((moss_packet, trailer_idx)) =
+        moss_protocol_nested_fsm::extract_packet(&bytes[last_trailer_idx..])
+    {
         moss_packets.push(moss_packet);
+        last_trailer_idx += trailer_idx + 1;
     }
 
     if moss_packets.is_empty() {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
-        let last_trailer_idx = byte_count - byte_iter.len() - 2;
-        Ok((moss_packets, last_trailer_idx))
+        Ok((moss_packets, last_trailer_idx - 1))
     }
 }
 
@@ -240,18 +239,21 @@ pub fn decode_from_file_fsm(path: std::path::PathBuf) -> PyResult<Vec<MossPacket
             break;
         }
 
+        let mut last_trailer_idx = 0;
+
         // Extend bytes_to_decode with the new data
         bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
 
-        let mut byte_iter = bytes_to_decode.iter();
-
         // Decode the bytes one event at a time until there's no more events to decode
-        while let Ok(moss_packet) = moss_protocol_nested_fsm::extract_packet(&mut byte_iter) {
+        while let Ok((moss_packet, current_trailer_idx)) =
+            moss_protocol_nested_fsm::extract_packet(&bytes_to_decode[last_trailer_idx..])
+        {
             moss_packets.push(moss_packet);
+            last_trailer_idx += current_trailer_idx + 1;
         }
 
         // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
-        bytes_to_decode = byte_iter.cloned().collect();
+        bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
     }
 
     if moss_packets.is_empty() {
