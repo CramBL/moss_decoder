@@ -185,7 +185,7 @@ fn test_decode_protocol_error() {
 }
 
 #[test]
-fn test_decode_from_file_func_fsm() {
+fn test_decode_multiple_events_fsm() {
     let expect_packets = 100000;
     let expect_hits = 2716940;
 
@@ -205,6 +205,7 @@ fn test_decode_from_file_func_fsm() {
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
+    println!("Last 10 bytes of file: {:X?}", f.get(f.len() - 10..));
 
     assert_eq!(
         last_trailer_idx,
