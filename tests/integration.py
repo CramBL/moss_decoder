@@ -21,7 +21,7 @@ def read_bytes_from_file(file_path: Path) -> bytes:
 def make_simple_moss_event_packet() -> bytes:
     """Make a complete simple MOSS packet containing
     Unit 0 and 1 hit in region 1 row 2 col 8"""
-    unit_frame_header_0 = b"\xD0"
+    unit_frame_header_1 = b"\xD1"
     padding = b"\xFA"
     unit_frame_trailer = b"\xE0"
     region_header_0 = b"\xC0"
@@ -33,7 +33,7 @@ def make_simple_moss_event_packet() -> bytes:
     data_2 = b"\x88"  # col 8
 
     simple_packet = (
-        unit_frame_header_0
+        unit_frame_header_1
         + region_header_0
         + region_header_1
         + data_0
@@ -47,29 +47,24 @@ def make_simple_moss_event_packet() -> bytes:
     return simple_packet
 
 
-def decode_multi_event(raw_bytes: bytes, fsm: bool = False) -> tuple[list["MossPacket"], int]:
+def decode_multi_event(
+    raw_bytes: bytes, fsm: bool = False
+) -> tuple[list["MossPacket"], int]:
     """Takes `bytes` and decodes it as `MossPacket`s.
     returns a tuple of `list[MossPackets]` and an int that indicates the
     index where the last MOSS trailer was seen
     """
     if fsm is True:
-        packets, last_trailer_idx = moss_decoder.decode_multiple_events_fsm(
-        raw_bytes)
+        packets, last_trailer_idx = moss_decoder.decode_multiple_events_fsm(raw_bytes)
     else:
-        packets, last_trailer_idx = moss_decoder.decode_multiple_events(
-        raw_bytes)
+        packets, last_trailer_idx = moss_decoder.decode_multiple_events(raw_bytes)
 
     return packets, last_trailer_idx
 
 
 def test_decode_multi_event(fsm: bool = False):
     """Test that multiple events are correctly decoded from raw bytes"""
-    print(
-        (
-            "=== Test that multiple events"
-            " are correctly decoded from raw bytes ==="
-        )
-    )
+    print(("=== Test that multiple events" " are correctly decoded from raw bytes ==="))
     raw_bytes = read_bytes_from_file(FILE_PATH)
     byte_count = len(raw_bytes)
     last_byte_idx = byte_count - 1
