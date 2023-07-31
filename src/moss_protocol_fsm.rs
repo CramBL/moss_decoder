@@ -217,45 +217,11 @@ pub fn add_data2(moss_packets: &mut [MossPacket], data2: u8) {
 
 #[cfg(test)]
 mod tests {
+    use crate::moss_protocol::test_util::*;
     use pretty_assertions::assert_eq;
 
     use super::*;
     use crate::MossPacket;
-
-    const IDLE: u8 = 0xFF;
-    const UNIT_FRAME_TRAILER: u8 = 0xE0;
-    const UNIT_FRAME_HEADER_1: u8 = 0xD1;
-    const REGION_HEADER_0: u8 = 0xC0;
-    const REGION_HEADER_1: u8 = 0xC1;
-    const REGION_HEADER_2: u8 = 0xC2;
-    const REGION_HEADER_3: u8 = 0xC3;
-    fn fake_event_simple() -> Vec<u8> {
-        vec![
-            UNIT_FRAME_HEADER_1,
-            REGION_HEADER_0,
-            // Hit row 2, col 8
-            0x00,
-            0x50,
-            0x88,
-            IDLE,
-            0x01,
-            0x50,
-            0x88,
-            REGION_HEADER_1,
-            // Hit row 301, col 433
-            0x25,
-            0x6E,
-            0xB1,
-            REGION_HEADER_2,
-            REGION_HEADER_3,
-            // Hit row 2, col 8
-            0x00,
-            0x50,
-            0x88,
-            UNIT_FRAME_TRAILER,
-        ]
-    }
-
     #[test]
     fn test_fsm() {
         let mut event_data_packet = fake_event_simple();
