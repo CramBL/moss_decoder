@@ -13,7 +13,7 @@ pub(crate) fn extract_packet<'a>(
 ) -> Option<MossPacket> {
     let mut unit_id: Option<u8> = None;
     for b in &mut bytes {
-        if (0xD0..=0xD9).contains(b) {
+        if MossWord::UNIT_FRAME_HEADER_RANGE.contains(b) {
             unit_id = Some(b & 0xF);
             break;
         }
@@ -104,9 +104,9 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                     current_region = 1;
                     st.transition(_RegionHeader1).as_enum()
                 }
-                0..=0b0011_1111 => {
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 0;
-                    add_data0(&mut hits, *b, current_region);
+                    add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Region Header 1 or DATA 0, got: {b:#X}"),
@@ -120,8 +120,8 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                 st.transition(_Data).as_enum()
             }
             DATA2_By_Data(st) => match *b {
-                0..=0b0011_1111 => {
-                    add_data0(&mut hits, *b, current_region);
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
+                    add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 MossWord::IDLE => st.transition(_Idle).as_enum(),
@@ -144,8 +144,8 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                 }
             },
             IDLE_By_Idle(st) => match *b {
-                0..=0b0011_1111 => {
-                    add_data0(&mut hits, *b, 0);
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
+                    add_data0(&mut hits, b, 0);
                     st.transition(_Data).as_enum()
                 }
                 REGION_HEADER1 => {
@@ -171,9 +171,9 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                     current_region = 2;
                     st.transition(_RegionHeader2).as_enum()
                 }
-                0..=0b0011_1111 => {
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 1;
-                    add_data0(&mut hits, *b, current_region);
+                    add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Region Header 2 or DATA 0, got: {b:#X}"),
@@ -183,18 +183,18 @@ pub(crate) fn extract_hits<'a>(bytes: &mut impl Iterator<Item = &'a u8>) -> Opti
                     current_region = 3;
                     st.transition(_RegionHeader3).as_enum()
                 }
-                0..=0b0011_1111 => {
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 2;
-                    add_data0(&mut hits, *b, current_region);
+                    add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Region Header 3 or DATA 0, got: {b:#X}"),
             },
             REGION_HEADER3_By_RegionHeader3(st) => match *b {
                 MossWord::UNIT_FRAME_TRAILER => break,
-                0..=0b0011_1111 => {
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 3;
-                    add_data0(&mut hits, *b, current_region);
+                    add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 _ => unreachable!("Expected Unit Frame Trailer or DATA 0, got: {b:#X}"),
@@ -247,14 +247,14 @@ mod tests {
 
     const IDLE: u8 = 0xFF;
     const UNIT_FRAME_TRAILER: u8 = 0xE0;
-    const UNIT_FRAME_HEADER_0: u8 = 0xD0;
+    const UNIT_FRAME_HEADER_1: u8 = 0xD1;
     const REGION_HEADER_0: u8 = 0xC0;
     const REGION_HEADER_1: u8 = 0xC1;
     const REGION_HEADER_2: u8 = 0xC2;
     const REGION_HEADER_3: u8 = 0xC3;
     fn fake_event_simple() -> Vec<u8> {
         vec![
-            UNIT_FRAME_HEADER_0,
+            UNIT_FRAME_HEADER_1,
             REGION_HEADER_0,
             // Hit row 2, col 8
             0x00,
@@ -290,14 +290,14 @@ mod tests {
 
         let unit_id = loop {
             if let Some(val) = byte_iter.next() {
-                if (0xD0..=0xD9).contains(val) {
+                if MossWord::UNIT_FRAME_HEADER_RANGE.contains(val) {
                     break val & 0xF;
                 }
             }
         };
 
         if let Some(hits) = extract_hits(&mut byte_iter) {
-            assert_eq!(unit_id, 0);
+            assert_eq!(unit_id, 1);
             assert_eq!(hits.len(), 4);
             assert_eq!(byte_count - byte_iter.len() - 1, 18);
         } else {
@@ -317,14 +317,14 @@ mod tests {
 
         let unit_id = loop {
             if let Some(val) = byte_iter.next() {
-                if (0xD0..=0xD9).contains(val) {
+                if MossWord::UNIT_FRAME_HEADER_RANGE.contains(val) {
                     break val & 0xF;
                 }
             }
         };
 
         if let Some(hits) = extract_hits(&mut byte_iter) {
-            assert_eq!(unit_id, 0);
+            assert_eq!(unit_id, 1);
             assert_eq!(hits.len(), 4);
             assert_eq!(byte_count - byte_iter.len() - 1, 18);
         } else {
@@ -333,14 +333,14 @@ mod tests {
 
         let unit_id = loop {
             if let Some(val) = byte_iter.next() {
-                if (0xD0..=0xD9).contains(val) {
+                if MossWord::UNIT_FRAME_HEADER_RANGE.contains(val) {
                     break val & 0xF;
                 }
             }
         };
 
         if let Some(hits) = extract_hits(&mut byte_iter) {
-            assert_eq!(unit_id, 0);
+            assert_eq!(unit_id, 1);
             assert_eq!(hits.len(), 4);
             assert_eq!(byte_count - byte_iter.len() - 1, 37);
         } else {

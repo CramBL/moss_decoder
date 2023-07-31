@@ -4,7 +4,7 @@ use pretty_assertions::assert_eq;
 
 const IDLE: u8 = 0xFF;
 const UNIT_FRAME_TRAILER: u8 = 0xE0;
-const UNIT_FRAME_HEADER_0: u8 = 0xD0;
+const UNIT_FRAME_HEADER_1: u8 = 0xD1;
 const REGION_HEADER_0: u8 = 0xC0;
 const REGION_HEADER_1: u8 = 0xC1;
 const REGION_HEADER_2: u8 = 0xC2;
@@ -12,7 +12,7 @@ const REGION_HEADER_3: u8 = 0xC3;
 
 fn fake_event_simple() -> Vec<u8> {
     vec![
-        UNIT_FRAME_HEADER_0,
+        UNIT_FRAME_HEADER_1,
         REGION_HEADER_0,
         // Hit row 2, col 8
         0x00,
@@ -39,7 +39,7 @@ fn fake_event_simple() -> Vec<u8> {
 
 fn fake_multiple_events() -> Vec<u8> {
     vec![
-        UNIT_FRAME_HEADER_0,
+        UNIT_FRAME_HEADER_1,
         IDLE,
         IDLE,
         REGION_HEADER_0,
@@ -110,7 +110,7 @@ fn fake_multiple_events() -> Vec<u8> {
 
 fn fake_event_protocol_error() -> Vec<u8> {
     vec![
-        UNIT_FRAME_HEADER_0,
+        UNIT_FRAME_HEADER_1,
         IDLE,
         IDLE,
         REGION_HEADER_0,
@@ -148,7 +148,7 @@ fn test_decoding_single_event() {
     assert_eq!(
         packet,
         MossPacket {
-            unit_id: 0,
+            unit_id: 1,
             hits: vec![
                 MossHit {
                     region: 0,
@@ -191,7 +191,7 @@ fn test_decoding_single_event_fsm() {
     assert_eq!(
         packet,
         MossPacket {
-            unit_id: 0,
+            unit_id: 1,
             hits: vec![
                 MossHit {
                     region: 0,

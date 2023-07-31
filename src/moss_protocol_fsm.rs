@@ -87,7 +87,7 @@ impl MossFsm {
                 MossWord::DELIMITER => {
                     (MossWord::Delimiter, st.transition(_WasDelimiter).as_enum())
                 }
-                0xD0..=0xD9 => (
+                b if MossWord::UNIT_FRAME_HEADER_RANGE.contains(&b) => (
                     MossWord::UnitFrameHeader,
                     st.transition(_WasFrameHeader).as_enum(),
                 ),
@@ -104,7 +104,9 @@ impl MossFsm {
                     MossWord::RegionHeader,
                     st.transition(_WasRegionHeader).as_enum(),
                 ),
-                0..=0b0011_1111 => (MossWord::Data0, st.transition(_WasData0).as_enum()),
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
+                    (MossWord::Data0, st.transition(_WasData0).as_enum())
+                }
                 MossWord::UNIT_FRAME_TRAILER => (
                     MossWord::UnitFrameTrailer,
                     st.transition(_WasFrameTrailer).as_enum(),
@@ -117,7 +119,9 @@ impl MossFsm {
             DATA1_By_WasData1(st) => (MossWord::Data2, st.transition(_WasData2).as_enum()),
             DATA2_By_WasData2(st) => match byte {
                 MossWord::IDLE => (MossWord::Idle, st.transition(_WasIdle).as_enum()),
-                0..=0b0011_1111 => (MossWord::Data0, st.transition(_WasData0).as_enum()),
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
+                    (MossWord::Data0, st.transition(_WasData0).as_enum())
+                }
                 0xC1..=0xC3 => (
                     MossWord::RegionHeader,
                     st.transition(_WasRegionHeader).as_enum(),
@@ -131,7 +135,9 @@ impl MossFsm {
                 ),
             },
             IDLE_By_WasIdle(st) => match byte {
-                0..=0b0011_1111 => (MossWord::Data0, st.transition(_WasData0).as_enum()),
+                b if MossWord::DATA_0_RANGE.contains(&b) => {
+                    (MossWord::Data0, st.transition(_WasData0).as_enum())
+                }
                 MossWord::UNIT_FRAME_TRAILER => (
                     MossWord::UnitFrameTrailer,
                     st.transition(_WasFrameTrailer).as_enum(),
@@ -144,7 +150,7 @@ impl MossFsm {
                 MossWord::DELIMITER => {
                     (MossWord::Delimiter, st.transition(_WasDelimiter).as_enum())
                 }
-                0xD0..=0xD9 => (
+                b if MossWord::UNIT_FRAME_HEADER_RANGE.contains(&b) => (
                     MossWord::UnitFrameHeader,
                     st.transition(_WasFrameHeader).as_enum(),
                 ),
@@ -154,7 +160,7 @@ impl MossFsm {
                 MossWord::DELIMITER => {
                     (MossWord::Delimiter, st.transition(_WasDelimiter).as_enum())
                 }
-                0xD0..=0xD9 => (
+                b if MossWord::UNIT_FRAME_HEADER_RANGE.contains(&b) => (
                     MossWord::UnitFrameHeader,
                     st.transition(_WasFrameHeader).as_enum(),
                 ),
@@ -218,14 +224,14 @@ mod tests {
 
     const IDLE: u8 = 0xFF;
     const UNIT_FRAME_TRAILER: u8 = 0xE0;
-    const UNIT_FRAME_HEADER_0: u8 = 0xD0;
+    const UNIT_FRAME_HEADER_1: u8 = 0xD1;
     const REGION_HEADER_0: u8 = 0xC0;
     const REGION_HEADER_1: u8 = 0xC1;
     const REGION_HEADER_2: u8 = 0xC2;
     const REGION_HEADER_3: u8 = 0xC3;
     fn fake_event_simple() -> Vec<u8> {
         vec![
-            UNIT_FRAME_HEADER_0,
+            UNIT_FRAME_HEADER_1,
             REGION_HEADER_0,
             // Hit row 2, col 8
             0x00,

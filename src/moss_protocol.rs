@@ -21,7 +21,7 @@ pub(crate) enum MossWord {
 
 impl MossWord {
     pub(super) const IDLE: u8 = 0xFF; // 1111_1111 (default)
-    pub(super) const UNIT_FRAME_HEADER: u8 = 0b1101_0001; // 1101_<unit_id[3:0]>
+                                      // pub(super) const UNIT_FRAME_HEADER_LOWEST_ID: u8 = 0b1101_0001; // 1101_<unit_id[3:0]>
     pub(super) const UNIT_FRAME_TRAILER: u8 = 0b1110_0000; // 1110_0000
     pub(super) const REGION_HEADER: u8 = 0b1100_0000; // 1100_00_<region_id[1:0]>
     pub(super) const DATA_0: u8 = 0b0000_0000; // 00_<hit_row_pos[8:3]>
@@ -37,7 +37,7 @@ impl MossWord {
             Self::IDLE => MossWord::Idle,
             Self::UNIT_FRAME_TRAILER => MossWord::UnitFrameTrailer,
             six_msb if six_msb & 0xFC == Self::REGION_HEADER => MossWord::RegionHeader,
-            four_msb if four_msb & 0xF0 == Self::UNIT_FRAME_HEADER => MossWord::UnitFrameHeader,
+            four_msb if four_msb & 0xF0 == 0b1101_0000 => MossWord::UnitFrameHeader,
             Self::DELIMITER => Self::Delimiter,
             two_msb if two_msb & 0b1100_0000 == Self::DATA_0 => MossWord::Data0,
             two_msb if two_msb & 0b1100_0000 == Self::DATA_1 => MossWord::Data1,
