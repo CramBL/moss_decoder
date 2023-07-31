@@ -22,11 +22,36 @@ pub(crate) fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), Box<st
                 },
                 bytes.len() - bytes_iter.len() - 1,
             )),
-            Err(e) => Err(e),
+            Err((err_str, err_idx)) => {
+                Err(format_error_msg(err_str, err_idx + 1, &bytes[header_idx..]).into())
+            }
         }
     } else {
         Err("No Unit Frame Header found".into())
     }
+}
+
+/// Formats an error message with an error description and the byte that triggered the error.
+///
+/// Also includes a dump of the bytes from the header and 10 bytes past the error.
+fn format_error_msg(err_str: &str, err_idx: usize, bytes: &[u8]) -> String {
+    format!(
+        "{err_str}, got: 0x{error_byte:02X}. Dump from header and 10 bytes past error: {prev} [ERROR = {error_byte:02X}] {next}",
+        prev = bytes
+            .iter()
+            .take(err_idx)
+            .map(|b| format!("{b:02X}"))
+            .collect::<Vec<_>>()
+            .join(" "),
+        error_byte = bytes[err_idx],
+        next = bytes
+            .iter()
+            .skip(err_idx+1)
+            .take(10)
+            .map(|b| format!("{b:02X}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    )
 }
 
 sm::sm! {
@@ -87,23 +112,6 @@ const REGION_HEADER1: u8 = 0xC1;
 const REGION_HEADER2: u8 = 0xC2;
 const REGION_HEADER3: u8 = 0xC3;
 
-fn format_error_msg<'a>(
-    err_b: u8,
-    bytes: impl Iterator<Item = &'a u8> + std::iter::DoubleEndedIterator + std::iter::ExactSizeIterator,
-    valid: &str,
-) -> Box<str> {
-    // Get the previous 10 and the next 10 bytes
-
-    let next = bytes.copied().take(10).collect::<Vec<_>>();
-
-    format!(
-        "Expected {valid}, got: {err_b:#X} | {err_b:#X} <-- {next_bytes:X?}",
-        err_b = err_b,
-        next_bytes = next,
-    )
-    .into_boxed_str()
-}
-
 /// Take an iterator that should be advanced to the position after a unit frame header.
 /// Advances the iterator and decodes any observed hits until a Unit Frame Trailer is encountered at which point the iteration stops.
 /// Returns all the decoded [MossHit]s if any.
@@ -112,7 +120,7 @@ pub(crate) fn extract_hits<'a>(
     bytes: &mut (impl Iterator<Item = &'a u8>
               + std::iter::DoubleEndedIterator
               + std::iter::ExactSizeIterator),
-) -> Result<Vec<MossHit>, Box<str>> {
+) -> Result<Vec<MossHit>, (&str, usize)> {
     let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
     let mut hits = Vec::<MossHit>::new();
 
@@ -122,7 +130,7 @@ pub(crate) fn extract_hits<'a>(
         sm = match sm {
             Initial_REGION_HEADER0_(st) => match *b {
                 REGION_HEADER0 => st.transition(_RegionHeader0).as_enum(),
-                _ => unreachable!("Expected Region Header 0, got: {b:#X}"),
+                _ => return Err(("Expected REGION_HEADER_1", i)),
             },
             _REGION_HEADER0_By_RegionHeader0(st) => match *b {
                 REGION_HEADER1 => {
@@ -134,19 +142,23 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => unreachable!("Valid: REGION_HEADER_1/DATA_0, got: {b:#X}"),
+                _ => return Err(("Expected REGION_HEADER_1/DATA_0", i)),
             },
             DATA0_By_Data(st) => {
                 if MossWord::DATA_1_RANGE.contains(b) {
                     add_data1(&mut hits, *b);
                     st.transition(_Data).as_enum()
                 } else {
-                    return Err(format_error_msg(*b, bytes, "DATA_1"));
+                    return Err(("Expected DATA_1", i));
                 }
             }
             DATA1_By_Data(st) => {
-                add_data2(&mut hits, *b);
-                st.transition(_Data).as_enum()
+                if MossWord::DATA_2_RANGE.contains(b) {
+                    add_data2(&mut hits, *b);
+                    st.transition(_Data).as_enum()
+                } else {
+                    return Err(("Expected DATA_2", i));
+                }
             }
             DATA2_By_Data(st) => match *b {
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
@@ -167,10 +179,7 @@ pub(crate) fn extract_hits<'a>(
                     st.transition(_RegionHeader3).as_enum()
                 }
                 MossWord::UNIT_FRAME_TRAILER => break,
-
-                _ => {
-                    unreachable!("Expected Region Header 1-3, DATA 0, or IDLE, got: {b:#X}")
-                }
+                _ => return Err(("Expected REGION_HEADER_{1-3}/DATA_0/IDLE", i)),
             },
             IDLE_By_Idle(st) => match *b {
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
@@ -190,10 +199,7 @@ pub(crate) fn extract_hits<'a>(
                     st.transition(_RegionHeader3).as_enum()
                 }
                 MossWord::UNIT_FRAME_TRAILER => break,
-
-                _ => {
-                    unreachable!("Expected Region Header 1-3, DATA 0, or IDLE, got: {b:#X}")
-                }
+                _ => return Err(("Expected REGION_HEADER_{1-3}/DATA_0/IDLE", i)),
             },
             REGION_HEADER1_By_RegionHeader1(st) => match *b {
                 REGION_HEADER2 => {
@@ -205,7 +211,7 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => unreachable!("Expected Region Header 2 or DATA 0, got: {b:#X}"),
+                _ => return Err(("Expected REGION_HEADER_2/DATA_0", i)),
             },
             REGION_HEADER2_By_RegionHeader2(st) => match *b {
                 REGION_HEADER3 => {
@@ -217,7 +223,7 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => unreachable!("Expected Region Header 3 or DATA 0, got: {b:#X}"),
+                _ => return Err(("Expected REGION_HEADER_3/DATA_0", i)),
             },
             REGION_HEADER3_By_RegionHeader3(st) => match *b {
                 MossWord::UNIT_FRAME_TRAILER => break,
@@ -226,7 +232,7 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => unreachable!("Expected Unit Frame Trailer or DATA 0, got: {b:#X}"),
+                _ => return Err(("Expected UNIT_FRAME_TRAILER/DATA_0", i)),
             },
             FRAME_TRAILER_By_FrameTrailer(_) => {
                 unreachable!("State machine should have already been used at this point")
