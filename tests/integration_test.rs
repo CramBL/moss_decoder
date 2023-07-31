@@ -253,3 +253,22 @@ fn test_decode_from_file_fsm() {
         "Expected {expect_hits} hits, got {total_hits}",
     );
 }
+
+#[test]
+fn test_decode_protocol_error_fsm() {
+    pyo3::prepare_freethreaded_python();
+
+    let event = fake_event_protocol_error();
+
+    match decode_event_fsm(&event) {
+        Ok(_) => {
+            panic!("This packet has a protocol error, but it was not detected!")
+        }
+        Err(e) if e.to_string().contains("Decoding failed with: Expected") => {
+            println!("Got expected error: {e}");
+        }
+        Err(e) => {
+            panic!("Got unexpected error: {e}");
+        }
+    }
+}
