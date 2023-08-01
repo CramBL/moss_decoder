@@ -59,7 +59,7 @@ def decode_multi_event(raw_bytes: bytes) -> tuple[list["MossPacket"], int]:
 
 def test_decode_multi_event():
     """Test that multiple events are correctly decoded from raw bytes"""
-    print(("=== Test that multiple events" " are correctly decoded from raw bytes ==="))
+    print("=== Test multiple events are correctly decoded from raw bytes ===")
     raw_bytes = read_bytes_from_file(FILE_PATH)
     byte_count = len(raw_bytes)
     last_byte_idx = byte_count - 1
