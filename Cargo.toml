@@ -1,6 +1,6 @@
 [package]
 name = "moss_decoder"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 authors = ["Marc Beck König <mbkj@tutamail.com>"]
 license = "MIT OR Apache-2.0"
