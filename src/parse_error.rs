@@ -7,11 +7,7 @@ pub(crate) enum ParseErrorKind {
 
 impl std::fmt::Display for ParseErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseErrorKind::NoHeaderFound => write!(f, "NoHeaderFound"),
-            ParseErrorKind::EndOfBufferNoTrailer => write!(f, "EndOfBufferNoTrailer"),
-            ParseErrorKind::ProtocolError => write!(f, "ProtocolError"),
-        }
+        write!(f, "{:?}", self)
     }
 }
 
@@ -35,6 +31,10 @@ impl ParseError {
 
     pub(crate) fn kind(&self) -> ParseErrorKind {
         self.kind
+    }
+
+    pub(crate) fn message(&self) -> &str {
+        &self.message
     }
 
     pub(crate) fn err_index(&self) -> usize {
