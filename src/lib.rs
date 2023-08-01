@@ -46,7 +46,7 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
 
 const READER_BUFFER_CAPACITY: usize = 10 * 1024 * 1024; // 10 MiB
 
-/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte with an FSM based decoder.
+/// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte.
 /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
 /// the call should be enclosed in a try/catch.
 #[pyfunction]
@@ -68,7 +68,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
 }
 
 #[pyfunction]
-/// Decodes multiple MOSS events into a list of [MossPacket]s based on an FSM decoder.
+/// Decodes multiple MOSS events into a list of [MossPacket]s.
 /// This function is optimized for speed and memory usage.
 pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
     let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
@@ -91,7 +91,7 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
 }
 
 #[pyfunction]
-/// Decodes a file containing raw MOSS data into a list of [MossPacket]s using an FSM based decoder.
+/// Decodes a file containing raw MOSS data into a list of [MossPacket]s.
 ///
 /// The file is read in chunks of 10 MiB until the end of the file is reached.
 /// If any errors are encountered while reading the file, any successfully decoded events are returned.
