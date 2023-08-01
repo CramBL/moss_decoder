@@ -39,8 +39,6 @@ pub fn fake_event_simple() -> Vec<u8> {
 pub fn fake_multiple_events() -> Vec<u8> {
     vec![
         UNIT_FRAME_HEADER_1,
-        IDLE,
-        IDLE,
         REGION_HEADER_0,
         // Hit row 2, col 8
         0x00,
@@ -59,18 +57,19 @@ pub fn fake_multiple_events() -> Vec<u8> {
         0x88,
         UNIT_FRAME_TRAILER,
         0xD1, // Unit 1, otherwise identical event
-        IDLE,
-        IDLE,
         REGION_HEADER_0,
         // Hit row 2, col 8
         0x00,
         0x50,
         0x88,
+        IDLE,
         REGION_HEADER_1,
         // Hit row 301, col 433
         0x25,
         0x6E,
         0xB1,
+        IDLE,
+        IDLE,
         REGION_HEADER_2,
         REGION_HEADER_3,
         // Hit row 2, col 8

@@ -49,25 +49,23 @@ Two classes are provided: `MossPacket` & `MossHit`.
 ```python
 decode_event(arg: bytes)  -> tuple[MossPacket, int]: ...
 # allows decoding a single event from an iterable of bytes
-``` 
+```
 
 **Returns**: the decoded `MossPacket` and the index the *unit frame trailer* was found. Throws if no valid `MossPacket` is found.
-```python 
+```python
 decode_multiple_events(arg: bytes) -> tuple[list[MossPacket], int]: ...
-# returns as many `MossPacket`s as can be decoded from the bytes iterable. 
-# This is much more effecient than calling `decode_event` multiple times. 
-``` 
+# returns as many `MossPacket`s as can be decoded from the bytes iterable.
+# This is much more effecient than calling `decode_event` multiple times.
+```
 **Returns**: A list of `MossPacket`s and the index of the last observed *unit frame trailer*. Throws if no valid `MossPacket`s are found.
 
-```python 
+```python
 decode_from_file(arg: str | Path) -> list[MossPacket]: ...
-# takes a `Path` and returns as many `MossPacket` as can be decoded from file. 
+# takes a `Path` and returns as many `MossPacket` as can be decoded from file.
 # This is the most effecient way of decoding data from a file.
-``` 
+```
 **Returns**: A list of `MossPacket`s. Throws if the file is not found or no valid `MossPacket`s are found.
 
-
-Each function has a variant with a `_fsm`-suffix that uses an FSM based decoder, which is both faster and validates state transitions in the MOSS protocol. 
 
 ## MOSS event data packet protocol FSM
 The a MOSS half-unit event data packet follows the states seen in the FSM below. The region header state is simplified here.
@@ -82,7 +80,7 @@ stateDiagram-v2
   idle : Idle
 
     [*] --> frame_header
-    
+
     frame_header --> region_header
 
     region_header --> region_header
@@ -97,7 +95,7 @@ stateDiagram-v2
       data_2 --> data_0
       data_2 --> [*]
     }
-    
+
     DATA --> idle
     DATA --> region_header
     DATA --> frame_trailer
@@ -111,7 +109,7 @@ stateDiagram-v2
 ```
 
 ## MOSS event data packet decoder FSM
-The FSM based decoder uses the following FSM.
+The raw data is decoded using the following FSM.
 The `delimiter` is expected to be `0xFA`. The default `Idle` value `0xFF` is also assumed.
 
 ```mermaid
@@ -121,7 +119,7 @@ direction LR
   frame_header : Unit Frame Header
   frame_trailer : Unit Frame Trailer
 
-  
+
   [*] --> delimiter
   delimiter --> EVENT
   delimiter --> delimiter
@@ -143,7 +141,7 @@ direction LR
   }
 
 ```
-Decoding hits takes place with the FSM in the next section.
+The `EVENT` state is reached by finding decoding a Unit Frame Header and then the decoder enters the `HITS` substate which is depicted in the FSM in the next section.
 
 ## Event packet hit decoder FSM
 
@@ -173,7 +171,7 @@ stateDiagram-v2
   DATA --> [*]
   region_header3 --> [*]
 
-  
+
     state DATA {
       direction LR
       [*] --> data_0
