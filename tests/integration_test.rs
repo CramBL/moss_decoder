@@ -272,3 +272,83 @@ fn test_decode_protocol_error_fsm() {
         }
     }
 }
+
+#[test]
+fn test_decode_events_skip_0_take_10() {
+    let skip = 0;
+    let take = 10;
+    let time = std::time::Instant::now();
+    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    println!(
+        "Read file in: {t:?}. Bytes: {cnt}",
+        t = time.elapsed(),
+        cnt = f.len()
+    );
+
+    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    println!("Got: {packets} packets", packets = p.len());
+    println!("Last trailer at index: {last_trailer_idx}");
+    assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
+}
+
+#[test]
+fn test_decode_events_skip_10_take_1() {
+    let skip = 10;
+    let take = 1;
+    let time = std::time::Instant::now();
+    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    println!(
+        "Read file in: {t:?}. Bytes: {cnt}",
+        t = time.elapsed(),
+        cnt = f.len()
+    );
+
+    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    println!("Got: {packets} packets", packets = p.len());
+    println!("Last trailer at index: {last_trailer_idx}");
+    assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
+}
+
+#[test]
+fn test_decode_events_skip_500_take_100() {
+    let skip = 500;
+    let take = 100;
+    let time = std::time::Instant::now();
+    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    println!(
+        "Read file in: {t:?}. Bytes: {cnt}",
+        t = time.elapsed(),
+        cnt = f.len()
+    );
+
+    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    println!("Got: {packets} packets", packets = p.len());
+    println!("Last trailer at index: {last_trailer_idx}");
+    assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
+}
+
+#[test]
+fn test_decode_events_skip_99000_take_1000() {
+    let skip = 99000;
+    let take = 1000;
+    let time = std::time::Instant::now();
+    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    println!(
+        "Read file in: {t:?}. Bytes: {cnt}",
+        t = time.elapsed(),
+        cnt = f.len()
+    );
+
+    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    println!("Got: {packets} packets", packets = p.len());
+    println!("Last trailer at index: {last_trailer_idx}");
+    assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
+}
