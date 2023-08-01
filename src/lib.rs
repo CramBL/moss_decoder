@@ -338,6 +338,7 @@ mod rust_only {
                     .iter()
                     .take_while(|b| **b != MossWord::UNIT_FRAME_TRAILER),
             );
+            prepend.push(MossWord::UNIT_FRAME_TRAILER); // Add the trailer back since `take_while` is EXCLUSIVE
             extract_packet(&prepend)
         } else {
             extract_packet(bytes)
