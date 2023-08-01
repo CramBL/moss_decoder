@@ -41,6 +41,11 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event, m)?)?;
     m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
     m.add_function(wrap_pyfunction!(decode_from_file, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_events_take_n, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        decode_events_skip_n_take_all_with_remainder,
+        m
+    )?)?;
 
     m.add_class::<MossHit>()?;
     m.add_class::<MossPacket>()?;
