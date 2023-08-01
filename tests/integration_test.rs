@@ -275,10 +275,9 @@ fn test_decode_protocol_error_fsm() {
 
 #[test]
 fn test_decode_events_skip_0_take_10() {
-    let skip = 0;
     let take = 10;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
-    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -291,7 +290,7 @@ fn test_decode_events_skip_10_take_1() {
     let take = 1;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -304,7 +303,7 @@ fn test_decode_events_skip_500_take_100() {
     let take = 100;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -317,7 +316,7 @@ fn test_decode_events_skip_99000_take_1000() {
     let take = 1000;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
     assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
@@ -330,11 +329,10 @@ const FILE_3_EVENTS_PARTIAL_START: &str = "tests/moss_noise_500-999b.raw";
 #[should_panic = "Failed decoding packet #5"]
 fn test_decode_split_events_skip_0_take_5() {
     pyo3::prepare_freethreaded_python();
-    let skip = 0;
     let take = 5;
     let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -348,7 +346,7 @@ fn test_decode_split_events_skip_1_take_2() {
     let take = 2;
     let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -362,9 +360,27 @@ fn test_decode_split_events_from_partial_event_skip_1_take_2() {
     let take = 2;
     let f = std::fs::read(std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START)).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
     assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
+}
+
+#[test]
+fn test_decode_split_events_with_remainder() {
+    pyo3::prepare_freethreaded_python();
+    let take = 100;
+    let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
+
+    assert!(decode_events_take_n(&f, take, None).is_err());
+
+    let (packets, remainder) = decode_events_skip_n_take_all_with_remainder(&f, 0).unwrap();
+
+    let remainder = remainder.unwrap();
+
+    println!("Got: {packets} packets", packets = packets.len());
+    println!("Remainder: {remainder} bytes", remainder = remainder.len());
+    assert_eq!(packets.len(), 4);
+    assert_eq!(remainder.len(), 43);
 }

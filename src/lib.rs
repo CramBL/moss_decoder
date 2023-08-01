@@ -163,16 +163,20 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 }
 
 #[pyfunction]
-/// Skips N events in the given bytes and decodes the next M events.
-pub fn decode_events_skip_n_take_m(
+/// Decodes N events from the given bytes. Optionally skips `skip` events before decoding.
+pub fn decode_events_take_n(
     bytes: &[u8],
-    skip: usize,
     take: usize,
+    skip: Option<usize>,
 ) -> PyResult<(Vec<MossPacket>, usize)> {
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(take);
 
     // Skip N events
-    let mut last_trailer_idx = if skip > 0 {
+    if skip.is_some_and(|s| s == 0) {
+        return Err(PyValueError::new_err("skip value must be greater than 0"));
+    }
+
+    let mut last_trailer_idx = if let Some(skip) = skip {
         find_trailer_n_idx(bytes, skip)?
     } else {
         0
@@ -207,12 +211,13 @@ pub fn decode_events_skip_n_take_m(
 }
 
 #[pyfunction]
-/// Skips N events in the given bytes and decode as many packets as possible until end of buffer.
-pub fn decode_events_skip_n_take_all(
+/// Skips N events in the given bytes and decode as many packets as possible until end of buffer, if the end of the buffer contains a partial event, those bytes are returned as a remainder.
+pub fn decode_events_skip_n_take_all_with_remainder(
     bytes: &[u8],
     skip: usize,
-) -> PyResult<(Vec<MossPacket>, usize)> {
+) -> PyResult<(Vec<MossPacket>, Option<Vec<u8>>)> {
     let mut moss_packets: Vec<MossPacket> = Vec::new();
+    let mut remainder: Option<Vec<u8>> = None;
 
     // Skip N events
     let mut last_trailer_idx = if skip > 0 {
@@ -228,6 +233,7 @@ pub fn decode_events_skip_n_take_all(
                 last_trailer_idx += trailer_idx + 1;
             }
             Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                remainder = Some(bytes[last_trailer_idx..].to_vec());
                 break;
             }
             Err(e) => {
@@ -242,7 +248,7 @@ pub fn decode_events_skip_n_take_all(
     if moss_packets.is_empty() {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
-        Ok((moss_packets, last_trailer_idx - 1))
+        Ok((moss_packets, remainder))
     }
 }
 
