@@ -24,8 +24,8 @@
 use std::io::Read;
 
 pub use moss_protocol::MossPacket;
-use moss_protocol::MossWord;
 use parse_error::ParseErrorKind;
+use parse_util::find_trailer_n_idx;
 use pyo3::exceptions::{PyAssertionError, PyBytesWarning, PyFileNotFoundError, PyValueError};
 use pyo3::prelude::*;
 
@@ -171,32 +171,12 @@ pub fn decode_events_skip_n_take_m(
 ) -> PyResult<(Vec<MossPacket>, usize)> {
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(take);
 
-    let mut last_trailer_idx = 0;
-
     // Skip N events
-    for i in 0..skip {
-        if let Some(header_idx) = bytes[last_trailer_idx..]
-            .iter()
-            .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
-        {
-            if let Some(trailer_idx) = &bytes[last_trailer_idx + header_idx..]
-                .iter()
-                .position(|b| *b == MossWord::UNIT_FRAME_TRAILER)
-            {
-                last_trailer_idx += header_idx + trailer_idx + 1;
-            } else {
-                return Err(PyAssertionError::new_err(format!(
-                    "No Unit Frame Trailer found for packet {packet_cnt}",
-                    packet_cnt = i + 1
-                )));
-            }
-        } else {
-            return Err(PyAssertionError::new_err(format!(
-                "No Unit Frame Header found for packet {packet_cnt}",
-                packet_cnt = i + 1
-            )));
-        }
-    }
+    let mut last_trailer_idx = if skip > 0 {
+        find_trailer_n_idx(bytes, skip)?
+    } else {
+        0
+    };
 
     for i in 0..take {
         match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
@@ -234,32 +214,12 @@ pub fn decode_events_skip_n_take_all(
 ) -> PyResult<(Vec<MossPacket>, usize)> {
     let mut moss_packets: Vec<MossPacket> = Vec::new();
 
-    let mut last_trailer_idx = 0;
-
     // Skip N events
-    for i in 0..skip {
-        if let Some(header_idx) = bytes[last_trailer_idx..]
-            .iter()
-            .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
-        {
-            if let Some(trailer_idx) = &bytes[last_trailer_idx + header_idx..]
-                .iter()
-                .position(|b| *b == MossWord::UNIT_FRAME_TRAILER)
-            {
-                last_trailer_idx += header_idx + trailer_idx + 1;
-            } else {
-                return Err(PyAssertionError::new_err(format!(
-                    "No Unit Frame Trailer found for packet {packet_cnt}",
-                    packet_cnt = i + 1
-                )));
-            }
-        } else {
-            return Err(PyAssertionError::new_err(format!(
-                "No Unit Frame Header found for packet {packet_cnt}",
-                packet_cnt = i + 1
-            )));
-        }
-    }
+    let mut last_trailer_idx = if skip > 0 {
+        find_trailer_n_idx(bytes, skip)?
+    } else {
+        0
+    };
 
     while last_trailer_idx < bytes.len() - MINIMUM_EVENT_SIZE - 1 {
         match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
