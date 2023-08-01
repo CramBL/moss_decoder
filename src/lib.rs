@@ -87,8 +87,8 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
             }
             Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
                 return Err(PyBytesWarning::new_err(format!(
-                    "Failed after decoding {packet_cnt} packets: {e}",
-                    packet_cnt = moss_packets.len()
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + 1
                 )));
             }
             Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
@@ -142,8 +142,8 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
                 }
                 Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
                     return Err(PyBytesWarning::new_err(format!(
-                        "Failed after decoding {packet_cnt} packets: {e}",
-                        packet_cnt = moss_packets.len()
+                        "Failed decoding packet #{packet_cnt}: {e}",
+                        packet_cnt = moss_packets.len() + 1
                     )));
                 }
                 Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
@@ -205,14 +205,74 @@ pub fn decode_events_skip_n_take_m(
             }
             Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
                 return Err(PyBytesWarning::new_err(format!(
-                    "Failed after decoding {packet_cnt} packets: {e}",
-                    packet_cnt = moss_packets.len()
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + 1
                 )))
             }
             Err(e) => {
                 return Err(PyAssertionError::new_err(format!(
                     "Decoding packet {packet_cnt} failed with: {e}",
                     packet_cnt = i + 1
+                )))
+            }
+        }
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok((moss_packets, last_trailer_idx - 1))
+    }
+}
+
+#[pyfunction]
+/// Skips N events in the given bytes and decode as many packets as possible until end of buffer.
+pub fn decode_events_skip_n_take_all(
+    bytes: &[u8],
+    skip: usize,
+) -> PyResult<(Vec<MossPacket>, usize)> {
+    let mut moss_packets: Vec<MossPacket> = Vec::new();
+
+    let mut last_trailer_idx = 0;
+
+    // Skip N events
+    for i in 0..skip {
+        if let Some(header_idx) = bytes[last_trailer_idx..]
+            .iter()
+            .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
+        {
+            if let Some(trailer_idx) = &bytes[last_trailer_idx + header_idx..]
+                .iter()
+                .position(|b| *b == MossWord::UNIT_FRAME_TRAILER)
+            {
+                last_trailer_idx += header_idx + trailer_idx + 1;
+            } else {
+                return Err(PyAssertionError::new_err(format!(
+                    "No Unit Frame Trailer found for packet {packet_cnt}",
+                    packet_cnt = i + 1
+                )));
+            }
+        } else {
+            return Err(PyAssertionError::new_err(format!(
+                "No Unit Frame Header found for packet {packet_cnt}",
+                packet_cnt = i + 1
+            )));
+        }
+    }
+
+    while last_trailer_idx < bytes.len() - MINIMUM_EVENT_SIZE - 1 {
+        match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
+            Ok((moss_packet, trailer_idx)) => {
+                moss_packets.push(moss_packet);
+                last_trailer_idx += trailer_idx + 1;
+            }
+            Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                break;
+            }
+            Err(e) => {
+                return Err(PyAssertionError::new_err(format!(
+                    "Decoding packet {packet_cnt} failed with: {e}",
+                    packet_cnt = moss_packets.len() + 1
                 )))
             }
         }
