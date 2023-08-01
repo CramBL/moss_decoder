@@ -71,9 +71,11 @@ pub(crate) fn extract_hits<'a>(
               + std::iter::DoubleEndedIterator
               + std::iter::ExactSizeIterator),
 ) -> Result<Vec<MossHit>, (&str, usize)> {
+    let total_bytes = bytes.len();
     let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
     let mut hits = Vec::<MossHit>::new();
 
+    let mut is_trailer_seen = false;
     let mut current_region = 0xff;
 
     for (i, b) in bytes.enumerate() {
@@ -128,7 +130,10 @@ pub(crate) fn extract_hits<'a>(
                     current_region = 3;
                     st.transition(_RegionHeader3).as_enum()
                 }
-                MossWord::UNIT_FRAME_TRAILER => break,
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 _ => return Err(("Expected REGION_HEADER_{1-3}/DATA_0/IDLE", i)),
             },
             IDLE_By_Idle(st) => match *b {
@@ -148,7 +153,10 @@ pub(crate) fn extract_hits<'a>(
                     current_region = 3;
                     st.transition(_RegionHeader3).as_enum()
                 }
-                MossWord::UNIT_FRAME_TRAILER => break,
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 _ => return Err(("Expected REGION_HEADER_{1-3}/DATA_0/IDLE", i)),
             },
             REGION_HEADER1_By_RegionHeader1(st) => match *b {
@@ -176,7 +184,10 @@ pub(crate) fn extract_hits<'a>(
                 _ => return Err(("Expected REGION_HEADER_3/DATA_0", i)),
             },
             REGION_HEADER3_By_RegionHeader3(st) => match *b {
-                MossWord::UNIT_FRAME_TRAILER => break,
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 3;
                     add_data0(&mut hits, b, current_region);
@@ -190,10 +201,14 @@ pub(crate) fn extract_hits<'a>(
         };
     }
 
-    if hits.is_empty() {
-        Ok(Vec::with_capacity(0))
+    if is_trailer_seen {
+        if hits.is_empty() {
+            Ok(Vec::with_capacity(0))
+        } else {
+            Ok(hits)
+        }
     } else {
-        Ok(hits)
+        Err(("Reached end with no UNIT_FRAME_TRAILER", total_bytes - 1))
     }
 }
 
