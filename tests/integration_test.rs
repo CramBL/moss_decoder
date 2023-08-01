@@ -384,3 +384,28 @@ fn test_decode_split_events_with_remainder() {
     assert_eq!(packets.len(), 4);
     assert_eq!(remainder.len(), 43);
 }
+
+#[test]
+fn test_decode_split_events_from_both_files() {
+    pyo3::prepare_freethreaded_python();
+    let take = 6;
+    let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
+    let f2 = std::fs::read(std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START)).unwrap();
+
+    // First attempt to decode 6 events from the first file, that should fail
+    assert!(decode_events_take_n(&f, take, None, None).is_err());
+
+    // Then fall back to decoding as many as possible and returning the remainder
+    let (packets, remainder) = decode_events_skip_n_take_all_with_remainder(&f, 0).unwrap();
+
+    let decoded_packets = packets.len();
+
+    // Now take the rest from the remainder and the next file
+    let (packets2, last_trailer_idx) =
+        decode_events_take_n(&f2, take - decoded_packets, None, remainder).unwrap();
+
+    println!("Got: {packets} packets", packets = packets.len());
+    println!("Got: {packets2} packets", packets2 = packets2.len());
+    println!("Last trailer at index: {last_trailer_idx}");
+    assert_eq!(packets.len() + packets2.len(), take);
+}
