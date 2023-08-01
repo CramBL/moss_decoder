@@ -29,7 +29,7 @@ use pyo3::prelude::*;
 
 pub mod moss_protocol;
 pub use moss_protocol::MossHit;
-pub mod moss_protocol_nested_fsm;
+pub mod decode_hits_fsm;
 
 /// A Python module for decoding raw MOSS data in Rust.
 #[pymodule]
@@ -144,8 +144,8 @@ mod rust_only {
     use pyo3::exceptions::PyValueError;
     use pyo3::PyResult;
 
+    use crate::decode_hits_fsm::extract_hits;
     use crate::moss_protocol::MossWord;
-    use crate::moss_protocol_nested_fsm::extract_hits;
     use crate::MossPacket;
 
     /// Functions that are only used in Rust and not exposed to Python.
