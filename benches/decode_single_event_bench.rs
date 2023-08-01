@@ -13,9 +13,6 @@ pub fn decode_single_event(c: &mut Criterion) {
         group.bench_function("decode event noexcept", |b| {
             b.iter(|| moss_decoder::decode_event_noexcept(&f))
         });
-        group.bench_function("decode event fsm alt", |b| {
-            b.iter(|| moss_decoder::slower_impls::decode_event_fsm_alt(&f))
-        });
         group.bench_function("decode event fsm iterator", |b| {
             b.iter(|| moss_decoder::decode_event_fsm(&f))
         });
