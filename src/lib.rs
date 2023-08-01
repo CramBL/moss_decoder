@@ -24,6 +24,7 @@
 use std::io::Read;
 
 pub use moss_protocol::MossPacket;
+use moss_protocol::MossWord;
 use pyo3::exceptions::{PyAssertionError, PyFileNotFoundError, PyValueError};
 use pyo3::prelude::*;
 
@@ -45,6 +46,7 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 const READER_BUFFER_CAPACITY: usize = 10 * 1024 * 1024; // 10 MiB
+const MINIMUM_EVENT_SIZE: usize = 6;
 
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte.
 /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
@@ -53,7 +55,7 @@ const READER_BUFFER_CAPACITY: usize = 10 * 1024 * 1024; // 10 MiB
 pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
     let byte_cnt = bytes.len();
 
-    if byte_cnt < 6 {
+    if byte_cnt < MINIMUM_EVENT_SIZE {
         return Err(PyValueError::new_err(
             "Received less than the minimum event size",
         ));
@@ -77,10 +79,18 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
 
     let mut last_trailer_idx = 0;
 
-    while let Ok((moss_packet, trailer_idx)) = rust_only::extract_packet(&bytes[last_trailer_idx..])
-    {
-        moss_packets.push(moss_packet);
-        last_trailer_idx += trailer_idx + 1;
+    while last_trailer_idx < bytes.len() - MINIMUM_EVENT_SIZE - 1 {
+        match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
+            Ok((moss_packet, trailer_idx)) => {
+                moss_packets.push(moss_packet);
+                last_trailer_idx += trailer_idx + 1;
+            }
+            Err(e) => {
+                return Err(PyAssertionError::new_err(format!(
+                    "Decoding failed with: {e}",
+                )))
+            }
+        }
     }
 
     if moss_packets.is_empty() {
@@ -123,7 +133,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 
         // Decode the bytes one event at a time until there's no more events to decode
         while let Ok((moss_packet, current_trailer_idx)) =
-            rust_only::extract_packet(&bytes_to_decode[last_trailer_idx..])
+            decode_event(&bytes_to_decode[last_trailer_idx..])
         {
             moss_packets.push(moss_packet);
             last_trailer_idx += current_trailer_idx + 1;
@@ -137,6 +147,61 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
         Ok(moss_packets)
+    }
+}
+
+#[pyfunction]
+/// Skips N events in the given bytes and decodes the next M events.
+pub fn decode_events_skip_n_take_m(
+    bytes: &[u8],
+    skip: usize,
+    take: usize,
+) -> PyResult<(Vec<MossPacket>, usize)> {
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(take);
+
+    let mut last_trailer_idx = 0;
+
+    // Skip N events
+    for i in 0..skip {
+        if let Some(header_idx) = bytes[last_trailer_idx..]
+            .iter()
+            .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
+        {
+            if let Some(trailer_idx) = &bytes[last_trailer_idx + header_idx..]
+                .iter()
+                .position(|b| *b == MossWord::UNIT_FRAME_TRAILER)
+            {
+                last_trailer_idx += header_idx + trailer_idx + 1;
+            } else {
+                return Err(PyAssertionError::new_err(format!(
+                    "No Unit Frame Trailer found for packet {i}",
+                )));
+            }
+        } else {
+            return Err(PyAssertionError::new_err(format!(
+                "No Unit Frame Header found for packet {i}"
+            )));
+        }
+    }
+
+    for i in 0..take {
+        match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
+            Ok((moss_packet, trailer_idx)) => {
+                moss_packets.push(moss_packet);
+                last_trailer_idx += trailer_idx + 1;
+            }
+            Err(e) => {
+                return Err(PyAssertionError::new_err(format!(
+                    "Decoding packet {i} failed with: {e}",
+                )))
+            }
+        }
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok((moss_packets, last_trailer_idx - 1))
     }
 }
 
