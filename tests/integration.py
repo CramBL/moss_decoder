@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 import moss_decoder
 from moss_decoder import MossPacket, MossHit
-from moss_decoder import decode_event, decode_event_noexcept
+from moss_decoder import decode_event
 
 FILE_PATH = Path("tests/moss_noise.raw")
 
@@ -106,13 +106,10 @@ def test_moss_packet_print():
     print("==> Test OK\n\n")
 
 
-def test_100k_single_decodes(noexcept=False):
+def test_100k_single_decodes():
     """Tests 100k calls to decode_event (single event decoding)"""
 
-    if noexcept:
-        print(("=== Test 100k calls to decode_event with noexcept ==="))
-    else:
-        print(("=== Test 100k calls to decode_event ==="))
+    print(("=== Test 100k calls to decode_event ==="))
 
     raw_bytes = read_bytes_from_file(FILE_PATH)
     byte_count = len(raw_bytes)
@@ -123,31 +120,21 @@ def test_100k_single_decodes(noexcept=False):
     packets = []
     last_trailer_idx = 0
 
-    if noexcept is False:
-        more_data = True
-        while more_data:
-            try:
-                pack, tmp_trailer_idx = moss_decoder.decode_event(
-                    raw_bytes[last_trailer_idx:]
-                )
-                packets.append(pack)
-                last_trailer_idx = last_trailer_idx + tmp_trailer_idx + 1
-            except ValueError as exc:
-                print(f"Decode event returned value error: {exc}")
-                more_data = False
-            except AssertionError as exc:
-                print(f"Decode event returned assertion error: {exc}")
-                more_data = False
-                raise exc
-
-    if noexcept is True:
-        res = 1
-        packets = []
-        while res != 0:
-            packet, res = decode_event_noexcept(raw_bytes[last_trailer_idx:])
-            if res != 0:
-                last_trailer_idx = last_trailer_idx + res + 1
-                packets.append(packet)
+    more_data = True
+    while more_data:
+        try:
+            pack, tmp_trailer_idx = moss_decoder.decode_event(
+                raw_bytes[last_trailer_idx:]
+            )
+            packets.append(pack)
+            last_trailer_idx = last_trailer_idx + tmp_trailer_idx + 1
+        except ValueError as exc:
+            print(f"Decode event returned value error: {exc}")
+            more_data = False
+        except AssertionError as exc:
+            print(f"Decode event returned assertion error: {exc}")
+            more_data = False
+            raise exc
 
     last_trailer_idx = last_trailer_idx - 1
 
@@ -222,5 +209,3 @@ if __name__ == "__main__":
     test_100k_single_decodes()
     print(f"Done in: {time.time()-start:.3f} s\n")
     start = time.time()
-    test_100k_single_decodes(noexcept=True)
-    print(f"Done in: {time.time()-start:.3f} s\n")
