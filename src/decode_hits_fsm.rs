@@ -2,15 +2,17 @@
 #![allow(non_camel_case_types)]
 
 use crate::moss_protocol::MossWord;
+use crate::parse_error::ParseError;
+use crate::parse_error::ParseErrorKind;
 use crate::MossHit;
 
 sm::sm! {
 
     MossDataFSM {
-        InitialStates { _REGION_HEADER0_ }
+        InitialStates { _UNIT_FRAME_HEADER_ }
 
         _Data {
-            _REGION_HEADER0_ => DATA0_
+            REGION_HEADER0_ => DATA0_
             REGION_HEADER1_ => DATA0_
             REGION_HEADER2_ => DATA0_
             REGION_HEADER3_ => DATA0_
@@ -25,28 +27,38 @@ sm::sm! {
         }
 
         _RegionHeader0 {
-            _REGION_HEADER0_ => _REGION_HEADER0_
+            _UNIT_FRAME_HEADER_ => REGION_HEADER0_
         }
 
         _RegionHeader1 {
-            _REGION_HEADER0_ => REGION_HEADER1_
+            _UNIT_FRAME_HEADER_ => REGION_HEADER1_
+            REGION_HEADER0_ => REGION_HEADER1_
             DATA2_ => REGION_HEADER1_
             IDLE_ => REGION_HEADER1_
         }
 
         _RegionHeader2 {
+            _UNIT_FRAME_HEADER_ => REGION_HEADER2_
+            REGION_HEADER0_ => REGION_HEADER2_
             REGION_HEADER1_ => REGION_HEADER2_
             DATA2_ => REGION_HEADER2_
             IDLE_ => REGION_HEADER2_
         }
 
         _RegionHeader3 {
+            _UNIT_FRAME_HEADER_ => REGION_HEADER3_
+            REGION_HEADER0_ => REGION_HEADER3_
+            REGION_HEADER1_ => REGION_HEADER3_
             REGION_HEADER2_ => REGION_HEADER3_
             DATA2_ => REGION_HEADER3_
             IDLE_ => REGION_HEADER3_
         }
 
         _FrameTrailer {
+            _UNIT_FRAME_HEADER_ => FRAME_TRAILER_
+            REGION_HEADER0_ => FRAME_TRAILER_
+            REGION_HEADER1_ => FRAME_TRAILER_
+            REGION_HEADER2_ => FRAME_TRAILER_
             REGION_HEADER3_ => FRAME_TRAILER_
             DATA2_ => FRAME_TRAILER_
             IDLE_ => FRAME_TRAILER_
@@ -70,36 +82,85 @@ pub(crate) fn extract_hits<'a>(
     bytes: &mut (impl Iterator<Item = &'a u8>
               + std::iter::DoubleEndedIterator
               + std::iter::ExactSizeIterator),
-) -> Result<Vec<MossHit>, (&str, usize)> {
-    let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
+) -> Result<Vec<MossHit>, ParseError> {
+    let total_bytes = bytes.len();
+    let mut sm = MossDataFSM::Machine::new(_UNIT_FRAME_HEADER_).as_enum();
     let mut hits = Vec::<MossHit>::new();
 
+    let mut is_trailer_seen = false;
     let mut current_region = 0xff;
 
     for (i, b) in bytes.enumerate() {
         sm = match sm {
-            Initial_REGION_HEADER0_(st) => match *b {
-                REGION_HEADER0 => st.transition(_RegionHeader0).as_enum(),
-                _ => return Err(("Expected REGION_HEADER_1", i)),
-            },
-            _REGION_HEADER0_By_RegionHeader0(st) => match *b {
+            Initial_UNIT_FRAME_HEADER_(st) => match *b {
+                REGION_HEADER0 => {
+                    current_region = 0;
+                    st.transition(_RegionHeader0).as_enum()
+                }
                 REGION_HEADER1 => {
                     current_region = 1;
                     st.transition(_RegionHeader1).as_enum()
+                }
+                REGION_HEADER2 => {
+                    current_region = 2;
+                    st.transition(_RegionHeader2).as_enum()
+                }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
+                }
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected REGION_HEADER_{1-3}/UNIT_FRAME_TRAILER",
+                        i,
+                    ))
+                }
+            },
+            REGION_HEADER0_By_RegionHeader0(st) => match *b {
+                REGION_HEADER1 => {
+                    current_region = 1;
+                    st.transition(_RegionHeader1).as_enum()
+                }
+                REGION_HEADER2 => {
+                    current_region = 2;
+                    st.transition(_RegionHeader2).as_enum()
+                }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
                 }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 0;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => return Err(("Expected REGION_HEADER_1/DATA_0", i)),
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected REGION_HEADER_{1-3}/DATA_0/UNIT_FRAME_TRAILER",
+                        i,
+                    ))
+                }
             },
             DATA0_By_Data(st) => {
                 if MossWord::DATA_1_RANGE.contains(b) {
                     add_data1(&mut hits, *b);
                     st.transition(_Data).as_enum()
                 } else {
-                    return Err(("Expected DATA_1", i));
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected DATA_1",
+                        i,
+                    ));
                 }
             }
             DATA1_By_Data(st) => {
@@ -107,7 +168,11 @@ pub(crate) fn extract_hits<'a>(
                     add_data2(&mut hits, *b);
                     st.transition(_Data).as_enum()
                 } else {
-                    return Err(("Expected DATA_2", i));
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected DATA_2",
+                        i,
+                    ));
                 }
             }
             DATA2_By_Data(st) => match *b {
@@ -128,8 +193,17 @@ pub(crate) fn extract_hits<'a>(
                     current_region = 3;
                     st.transition(_RegionHeader3).as_enum()
                 }
-                MossWord::UNIT_FRAME_TRAILER => break,
-                _ => return Err(("Expected REGION_HEADER_{1-3}/DATA_0/IDLE", i)),
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected REGION_HEADER_{1-3}/DATA_0/IDLE/UNIT_FRAME_TRAILER",
+                        i,
+                    ))
+                }
             },
             IDLE_By_Idle(st) => match *b {
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
@@ -148,20 +222,43 @@ pub(crate) fn extract_hits<'a>(
                     current_region = 3;
                     st.transition(_RegionHeader3).as_enum()
                 }
-                MossWord::UNIT_FRAME_TRAILER => break,
-                _ => return Err(("Expected REGION_HEADER_{1-3}/DATA_0/IDLE", i)),
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected REGION_HEADER_{1-3}/DATA_0/IDLE/UNIT_FRAME_TRAILER",
+                        i,
+                    ))
+                }
             },
             REGION_HEADER1_By_RegionHeader1(st) => match *b {
                 REGION_HEADER2 => {
                     current_region = 2;
                     st.transition(_RegionHeader2).as_enum()
                 }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
+                }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 1;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => return Err(("Expected REGION_HEADER_2/DATA_0", i)),
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected REGION_HEADER_{2-3}/DATA_0/UNIT_FRAME_TRAILER",
+                        i,
+                    ))
+                }
             },
             REGION_HEADER2_By_RegionHeader2(st) => match *b {
                 REGION_HEADER3 => {
@@ -173,16 +270,35 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => return Err(("Expected REGION_HEADER_3/DATA_0", i)),
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected REGION_HEADER_3/DATA_0/UNIT_FRAME_TRAILER",
+                        i,
+                    ))
+                }
             },
             REGION_HEADER3_By_RegionHeader3(st) => match *b {
-                MossWord::UNIT_FRAME_TRAILER => break,
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 3;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                _ => return Err(("Expected UNIT_FRAME_TRAILER/DATA_0", i)),
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
+                _ => {
+                    return Err(ParseError::new(
+                        ParseErrorKind::ProtocolError,
+                        "Expected UNIT_FRAME_TRAILER/DATA_0/UNIT_FRAME_TRAILER",
+                        i,
+                    ))
+                }
             },
             FRAME_TRAILER_By_FrameTrailer(_) => {
                 unreachable!("State machine should have already been used at this point")
@@ -190,10 +306,18 @@ pub(crate) fn extract_hits<'a>(
         };
     }
 
-    if hits.is_empty() {
-        Ok(Vec::with_capacity(0))
+    if is_trailer_seen {
+        if hits.is_empty() {
+            Ok(Vec::with_capacity(0))
+        } else {
+            Ok(hits)
+        }
     } else {
-        Ok(hits)
+        Err(ParseError::new(
+            ParseErrorKind::EndOfBufferNoTrailer,
+            "Reached end with no UNIT_FRAME_TRAILER",
+            total_bytes - 1,
+        ))
     }
 }
 
