@@ -31,7 +31,7 @@ pub mod moss_protocol;
 pub use moss_protocol::MossHit;
 pub mod decode_hits_fsm;
 
-/// A Python module for decoding raw MOSS data in Rust.
+/// A Python module for decoding raw MOSS data effeciently in Rust.
 #[pymodule]
 fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event, m)?)?;
