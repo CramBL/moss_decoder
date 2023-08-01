@@ -354,7 +354,7 @@ fn test_decode_events_skip_99000_take_1000() {
 }
 
 #[test]
-#[should_panic = "Decoding packet 5 failed with"]
+#[should_panic = "Failed decoding packet #5"]
 // Only 5 packets in file.
 fn test_decode_split_events_skip_0_take_5() {
     pyo3::prepare_freethreaded_python();
