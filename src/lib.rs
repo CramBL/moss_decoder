@@ -59,7 +59,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
         ));
     }
 
-    match moss_protocol_nested_fsm::extract_packet(bytes) {
+    match rust_only::extract_packet(bytes) {
         Ok((moss_packet, trailer_idx)) => Ok((moss_packet, trailer_idx)),
         Err(e) => Err(PyAssertionError::new_err(format!(
             "Decoding failed with: {e}",
@@ -77,8 +77,7 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
 
     let mut last_trailer_idx = 0;
 
-    while let Ok((moss_packet, trailer_idx)) =
-        moss_protocol_nested_fsm::extract_packet(&bytes[last_trailer_idx..])
+    while let Ok((moss_packet, trailer_idx)) = rust_only::extract_packet(&bytes[last_trailer_idx..])
     {
         moss_packets.push(moss_packet);
         last_trailer_idx += trailer_idx + 1;
@@ -124,7 +123,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 
         // Decode the bytes one event at a time until there's no more events to decode
         while let Ok((moss_packet, current_trailer_idx)) =
-            moss_protocol_nested_fsm::extract_packet(&bytes_to_decode[last_trailer_idx..])
+            rust_only::extract_packet(&bytes_to_decode[last_trailer_idx..])
         {
             moss_packets.push(moss_packet);
             last_trailer_idx += current_trailer_idx + 1;
@@ -145,6 +144,10 @@ mod rust_only {
     use pyo3::exceptions::PyValueError;
     use pyo3::PyResult;
 
+    use crate::moss_protocol::MossWord;
+    use crate::moss_protocol_nested_fsm::extract_hits;
+    use crate::MossPacket;
+
     /// Functions that are only used in Rust and not exposed to Python.
 
     const MIN_PREALLOC: usize = 10;
@@ -164,5 +167,54 @@ mod rust_only {
             MIN_PREALLOC
         };
         Ok(prealloc)
+    }
+
+    /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
+    /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
+    #[inline]
+    pub(crate) fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), Box<str>> {
+        if let Some(header_idx) = bytes
+            .iter()
+            .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
+        {
+            let mut bytes_iter = bytes.iter().skip(header_idx + 1);
+            match extract_hits(&mut bytes_iter) {
+                Ok(hits) => Ok((
+                    MossPacket {
+                        unit_id: bytes[header_idx] & 0xF,
+                        hits,
+                    },
+                    bytes.len() - bytes_iter.len() - 1,
+                )),
+                Err((err_str, err_idx)) => {
+                    Err(format_error_msg(err_str, err_idx + 1, &bytes[header_idx..]).into())
+                }
+            }
+        } else {
+            Err("No Unit Frame Header found".into())
+        }
+    }
+
+    /// Formats an error message with an error description and the byte that triggered the error.
+    ///
+    /// Also includes a dump of the bytes from the header and 10 bytes past the error.
+    fn format_error_msg(err_str: &str, err_idx: usize, bytes: &[u8]) -> String {
+        format!(
+        "{err_str}, got: 0x{error_byte:02X}. Dump from header and 10 bytes past error: {prev} [ERROR = {error_byte:02X}] {next}",
+        prev = bytes
+            .iter()
+            .take(err_idx)
+            .map(|b| format!("{b:02X}"))
+            .collect::<Vec<_>>()
+            .join(" "),
+        error_byte = bytes[err_idx],
+        next = bytes
+            .iter()
+            .skip(err_idx+1)
+            .take(10)
+            .map(|b| format!("{b:02X}"))
+            .collect::<Vec<_>>()
+            .join(" ")
+    )
     }
 }

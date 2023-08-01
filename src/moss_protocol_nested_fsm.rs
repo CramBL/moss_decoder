@@ -3,56 +3,6 @@
 
 use crate::moss_protocol::MossWord;
 use crate::MossHit;
-use crate::MossPacket;
-
-/// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
-/// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
-#[inline]
-pub(crate) fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), Box<str>> {
-    if let Some(header_idx) = bytes
-        .iter()
-        .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
-    {
-        let mut bytes_iter = bytes.iter().skip(header_idx + 1);
-        match extract_hits(&mut bytes_iter) {
-            Ok(hits) => Ok((
-                MossPacket {
-                    unit_id: bytes[header_idx] & 0xF,
-                    hits,
-                },
-                bytes.len() - bytes_iter.len() - 1,
-            )),
-            Err((err_str, err_idx)) => {
-                Err(format_error_msg(err_str, err_idx + 1, &bytes[header_idx..]).into())
-            }
-        }
-    } else {
-        Err("No Unit Frame Header found".into())
-    }
-}
-
-/// Formats an error message with an error description and the byte that triggered the error.
-///
-/// Also includes a dump of the bytes from the header and 10 bytes past the error.
-fn format_error_msg(err_str: &str, err_idx: usize, bytes: &[u8]) -> String {
-    format!(
-        "{err_str}, got: 0x{error_byte:02X}. Dump from header and 10 bytes past error: {prev} [ERROR = {error_byte:02X}] {next}",
-        prev = bytes
-            .iter()
-            .take(err_idx)
-            .map(|b| format!("{b:02X}"))
-            .collect::<Vec<_>>()
-            .join(" "),
-        error_byte = bytes[err_idx],
-        next = bytes
-            .iter()
-            .skip(err_idx+1)
-            .take(10)
-            .map(|b| format!("{b:02X}"))
-            .collect::<Vec<_>>()
-            .join(" ")
-    )
-}
 
 sm::sm! {
 
@@ -276,10 +226,10 @@ fn add_data2(moss_hits: &mut [MossHit], data2: u8) {
 
 #[cfg(test)]
 mod tests {
-    use crate::moss_protocol::test_util::*;
-    use pretty_assertions::assert_eq;
-
     use super::*;
+    use crate::moss_protocol::test_util::*;
+    use crate::rust_only::extract_packet;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_fsm() {
@@ -363,7 +313,6 @@ mod tests {
 
     #[test]
     fn test_protocol_error() {
-        //pyo3::prepare_freethreaded_python();
         let packet = fake_event_protocol_error();
 
         if let Err(e) = extract_packet(&packet) {
