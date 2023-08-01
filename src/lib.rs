@@ -25,7 +25,8 @@ use std::io::Read;
 
 pub use moss_protocol::MossPacket;
 use moss_protocol::MossWord;
-use pyo3::exceptions::{PyAssertionError, PyFileNotFoundError, PyValueError};
+use parse_error::ParseErrorKind;
+use pyo3::exceptions::{PyAssertionError, PyBytesWarning, PyFileNotFoundError, PyValueError};
 use pyo3::prelude::*;
 
 pub mod moss_protocol;
@@ -84,11 +85,13 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
                 moss_packets.push(moss_packet);
                 last_trailer_idx += trailer_idx + 1;
             }
-            Err(e) => {
-                return Err(PyAssertionError::new_err(format!(
-                    "Decoding failed with: {e}",
-                )))
+            Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                return Err(PyBytesWarning::new_err(format!(
+                    "Failed after decoding {packet_cnt} packets: {e}",
+                    packet_cnt = moss_packets.len()
+                )));
             }
+            Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
         }
     }
 
@@ -131,11 +134,20 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
         bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
 
         // Decode the bytes one event at a time until there's no more events to decode
-        while let Ok((moss_packet, current_trailer_idx)) =
-            decode_event(&bytes_to_decode[last_trailer_idx..])
-        {
-            moss_packets.push(moss_packet);
-            last_trailer_idx += current_trailer_idx + 1;
+        while last_trailer_idx < bytes_read - MINIMUM_EVENT_SIZE - 1 {
+            match rust_only::extract_packet(&bytes_to_decode[last_trailer_idx..]) {
+                Ok((moss_packet, trailer_idx)) => {
+                    moss_packets.push(moss_packet);
+                    last_trailer_idx += trailer_idx + 1;
+                }
+                Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                    return Err(PyBytesWarning::new_err(format!(
+                        "Failed after decoding {packet_cnt} packets: {e}",
+                        packet_cnt = moss_packets.len()
+                    )));
+                }
+                Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
+            }
         }
 
         // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
