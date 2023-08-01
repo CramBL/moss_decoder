@@ -323,14 +323,16 @@ fn test_decode_events_skip_99000_take_1000() {
     assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
 }
 
+const FILE_4_EVENTS_PARTIAL_END: &str = "tests/moss_noise_0-499b.raw";
+const FILE_3_EVENTS_PARTIAL_START: &str = "tests/moss_noise_500-999b.raw";
+
 #[test]
 #[should_panic = "Failed decoding packet #5"]
-// Only 5 packets in file.
 fn test_decode_split_events_skip_0_take_5() {
     pyo3::prepare_freethreaded_python();
     let skip = 0;
     let take = 5;
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise_0-499b.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
 
     let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
 
@@ -340,12 +342,25 @@ fn test_decode_split_events_skip_0_take_5() {
 }
 
 #[test]
-// Only 5 packets in file.
 fn test_decode_split_events_skip_1_take_2() {
     pyo3::prepare_freethreaded_python();
     let skip = 1;
     let take = 2;
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise_0-499b.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
+
+    let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
+
+    println!("Got: {packets} packets", packets = p.len());
+    println!("Last trailer at index: {last_trailer_idx}");
+    assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
+}
+
+#[test]
+fn test_decode_split_events_from_partial_event_skip_1_take_2() {
+    pyo3::prepare_freethreaded_python();
+    let skip = 1;
+    let take = 2;
+    let f = std::fs::read(std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START)).unwrap();
 
     let (p, last_trailer_idx) = decode_events_skip_n_take_m(&f, skip, take).unwrap();
 
