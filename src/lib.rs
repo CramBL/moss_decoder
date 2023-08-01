@@ -64,7 +64,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
         ));
     }
 
-    match rust_only::extract_packet(bytes) {
+    match rust_only::extract_packet_from_buf(bytes, None) {
         Ok((moss_packet, trailer_idx)) => Ok((moss_packet, trailer_idx)),
         Err(e) => Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
     }
@@ -81,7 +81,7 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
     let mut last_trailer_idx = 0;
 
     while last_trailer_idx < bytes.len() - MINIMUM_EVENT_SIZE - 1 {
-        match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
+        match rust_only::extract_packet_from_buf(&bytes[last_trailer_idx..], None) {
             Ok((moss_packet, trailer_idx)) => {
                 moss_packets.push(moss_packet);
                 last_trailer_idx += trailer_idx + 1;
@@ -136,7 +136,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 
         // Decode the bytes one event at a time until there's no more events to decode
         while last_trailer_idx < bytes_read - MINIMUM_EVENT_SIZE - 1 {
-            match rust_only::extract_packet(&bytes_to_decode[last_trailer_idx..]) {
+            match rust_only::extract_packet_from_buf(&bytes_to_decode[last_trailer_idx..], None) {
                 Ok((moss_packet, trailer_idx)) => {
                     moss_packets.push(moss_packet);
                     last_trailer_idx += trailer_idx + 1;
@@ -163,17 +163,25 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 }
 
 #[pyfunction]
-/// Decodes N events from the given bytes. Optionally skips `skip` events before decoding.
+/// Decodes N events from the given bytes.
+/// Optionally allows for either:
+/// - skipping `skip` events before decoding.
+/// - prepending `prepend_buffer` to the bytes before decoding.
 pub fn decode_events_take_n(
     bytes: &[u8],
     take: usize,
     skip: Option<usize>,
+    mut prepend_buffer: Option<Vec<u8>>,
 ) -> PyResult<(Vec<MossPacket>, usize)> {
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(take);
 
     // Skip N events
     if skip.is_some_and(|s| s == 0) {
         return Err(PyValueError::new_err("skip value must be greater than 0"));
+    } else if skip.is_some() && prepend_buffer.is_some() {
+        return Err(PyValueError::new_err(
+            "skip and prepend_buffer cannot be used together",
+        ));
     }
 
     let mut last_trailer_idx = if let Some(skip) = skip {
@@ -183,7 +191,8 @@ pub fn decode_events_take_n(
     };
 
     for i in 0..take {
-        match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
+        match rust_only::extract_packet_from_buf(&bytes[last_trailer_idx..], prepend_buffer.take())
+        {
             Ok((moss_packet, trailer_idx)) => {
                 moss_packets.push(moss_packet);
                 last_trailer_idx += trailer_idx + 1;
@@ -227,7 +236,7 @@ pub fn decode_events_skip_n_take_all_with_remainder(
     };
 
     while last_trailer_idx < bytes.len() - MINIMUM_EVENT_SIZE - 1 {
-        match rust_only::extract_packet(&bytes[last_trailer_idx..]) {
+        match rust_only::extract_packet_from_buf(&bytes[last_trailer_idx..], None) {
             Ok((moss_packet, trailer_idx)) => {
                 moss_packets.push(moss_packet);
                 last_trailer_idx += trailer_idx + 1;
@@ -285,7 +294,7 @@ mod rust_only {
     /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
     /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
     #[inline]
-    pub(crate) fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), ParseError> {
+    fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), ParseError> {
         if let Some(header_idx) = bytes
             .iter()
             .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
@@ -311,6 +320,27 @@ mod rust_only {
                 "No Unit Frame Header found",
                 0,
             ))
+        }
+    }
+
+    #[inline]
+    /// If a prepend buffer is given, it is prepended to `bytes` and the packet is extracted from the combined buffer.
+    /// If no prepend buffer is given, the packet is extracted from `bytes`.
+    pub(crate) fn extract_packet_from_buf(
+        bytes: &[u8],
+        prepend_bytes: Option<Vec<u8>>,
+    ) -> Result<(MossPacket, usize), ParseError> {
+        // Collect bytes from `bytes` until a header is seen
+
+        if let Some(mut prepend) = prepend_bytes {
+            prepend.extend(
+                bytes
+                    .iter()
+                    .take_while(|b| **b != MossWord::UNIT_FRAME_TRAILER),
+            );
+            extract_packet(&prepend)
+        } else {
+            extract_packet(bytes)
         }
     }
 
