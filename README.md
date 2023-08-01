@@ -184,6 +184,7 @@ stateDiagram-v2
       data_1 --> data_2
       data_2 --> data_0
       data_2 --> idle
+      idle --> idle
       idle --> [*]
       idle --> data_0
       data_2 --> [*]

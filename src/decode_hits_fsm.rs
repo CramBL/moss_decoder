@@ -24,6 +24,7 @@ sm::sm! {
 
         _Idle {
             DATA2_ => IDLE_
+            IDLE_ => IDLE_
         }
 
         _RegionHeader0 {
@@ -222,6 +223,7 @@ pub(crate) fn extract_hits<'a>(
                     current_region = 3;
                     st.transition(_RegionHeader3).as_enum()
                 }
+                MossWord::IDLE => st.transition(_Idle).as_enum(),
                 MossWord::UNIT_FRAME_TRAILER => {
                     is_trailer_seen = true;
                     break;
