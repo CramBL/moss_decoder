@@ -1,8 +1,6 @@
 /target
 dev-bench.md
 prod-bench.md
-dev-fsm-bench.md
-prod-fsm-bench.md
 
 
 # Byte-compiled / optimized / DLL files

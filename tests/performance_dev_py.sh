@@ -40,15 +40,6 @@ function measure_performance_prod {
         --time-unit millisecond\
         --shell=bash\
         --export-markdown dev-bench.md
-        
-    # Run benchmark with FSM decoder
-    hyperfine \
-        "${BENCH_CMD_FSM}"\
-        --warmup 3\
-        --style full\
-        --time-unit millisecond\
-        --shell=bash\
-        --export-markdown dev-fsm-bench.md
 }
 
 
