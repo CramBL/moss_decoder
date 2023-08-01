@@ -64,9 +64,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
 
     match rust_only::extract_packet(bytes) {
         Ok((moss_packet, trailer_idx)) => Ok((moss_packet, trailer_idx)),
-        Err(e) => Err(PyAssertionError::new_err(format!(
-            "Decoding failed with: {e}",
-        ))),
+        Err(e) => Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
     }
 }
 
@@ -258,7 +256,7 @@ mod rust_only {
                 )),
                 Err(e) => Err(ParseError::new(
                     e.kind(),
-                    &format_error_msg(&e.to_string(), e.err_index() + 1, &bytes[header_idx..]),
+                    &format_error_msg(e.message(), e.err_index() + 1, &bytes[header_idx..]),
                     header_idx + e.err_index() + 1,
                 )),
             }
