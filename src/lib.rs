@@ -203,6 +203,12 @@ pub fn decode_events_skip_n_take_m(
                 moss_packets.push(moss_packet);
                 last_trailer_idx += trailer_idx + 1;
             }
+            Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                return Err(PyBytesWarning::new_err(format!(
+                    "Failed after decoding {packet_cnt} packets: {e}",
+                    packet_cnt = moss_packets.len()
+                )))
+            }
             Err(e) => {
                 return Err(PyAssertionError::new_err(format!(
                     "Decoding packet {packet_cnt} failed with: {e}",
