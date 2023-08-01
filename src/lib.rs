@@ -33,6 +33,7 @@ pub mod moss_protocol;
 pub use moss_protocol::MossHit;
 pub mod decode_hits_fsm;
 pub(crate) mod parse_error;
+pub(crate) mod parse_util;
 
 /// A Python module for decoding raw MOSS data effeciently in Rust.
 #[pymodule]
@@ -366,7 +367,6 @@ mod rust_only {
             .take(10)
             .map(|b| format!("{b:02X}"))
             .collect::<Vec<_>>()
-            .join(" ")
-    )
+            .join(" "))
     }
 }
