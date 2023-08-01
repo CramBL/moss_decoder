@@ -51,7 +51,7 @@ fn test_decoding_single_event_fsm() {
     //
     let event = fake_event_simple();
 
-    let (packet, last_trailer_idx) = decode_event_fsm(&event).unwrap();
+    let (packet, last_trailer_idx) = decode_event(&event).unwrap();
 
     assert!(
         last_trailer_idx == event.len() - 1,
@@ -102,11 +102,11 @@ fn test_decoding_multiple_events_one_call() {
 
     let packet_count = moss_packets.len();
 
-    assert_eq!(packet_count, 1, "Expected 1 packet, got {}", packet_count);
-
     for p in moss_packets {
         println!("{p:?}");
     }
+
+    assert_eq!(packet_count, 1, "Expected 1 packet, got {}", packet_count);
 }
 
 #[test]
@@ -175,7 +175,7 @@ fn test_decode_protocol_error() {
         Ok(_) => {
             panic!("This packet has a protocol error, but it was not detected!")
         }
-        Err(e) if e.to_string().contains("Protocol error") => {
+        Err(e) if e.to_string().contains("Decoding failed with") => {
             println!("Got expected error: {e}");
         }
         Err(e) => {
@@ -200,7 +200,7 @@ fn test_decode_multiple_events_fsm() {
     );
 
     println!("Decoding content...");
-    let (p, last_trailer_idx) = decode_multiple_events_fsm(&f).unwrap();
+    let (p, last_trailer_idx) = decode_multiple_events(&f).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets} packets", packets = p.len());
@@ -234,7 +234,7 @@ fn test_decode_from_file_fsm() {
     let expect_hits = 2716940;
 
     let packets =
-        moss_decoder::decode_from_file_fsm("tests/moss_noise.raw".to_string().into()).unwrap();
+        moss_decoder::decode_from_file("tests/moss_noise.raw".to_string().into()).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets}", packets = packets.len());
@@ -260,7 +260,7 @@ fn test_decode_protocol_error_fsm() {
 
     let event = fake_event_protocol_error();
 
-    match decode_event_fsm(&event) {
+    match decode_event(&event) {
         Ok(_) => {
             panic!("This packet has a protocol error, but it was not detected!")
         }
