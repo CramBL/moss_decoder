@@ -277,7 +277,7 @@ fn test_decode_protocol_error_fsm() {
 fn test_decode_events_skip_0_take_10() {
     let take = 10;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
-    let (p, last_trailer_idx) = decode_events_take_n(&f, take, None).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, None, None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -290,7 +290,7 @@ fn test_decode_events_skip_10_take_1() {
     let take = 1;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip), None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -303,7 +303,7 @@ fn test_decode_events_skip_500_take_100() {
     let take = 100;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip), None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -316,7 +316,7 @@ fn test_decode_events_skip_99000_take_1000() {
     let take = 1000;
     let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip), None).unwrap();
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
     assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
@@ -332,7 +332,7 @@ fn test_decode_split_events_skip_0_take_5() {
     let take = 5;
     let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_take_n(&f, take, None).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, None, None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -346,7 +346,7 @@ fn test_decode_split_events_skip_1_take_2() {
     let take = 2;
     let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip), None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -360,7 +360,7 @@ fn test_decode_split_events_from_partial_event_skip_1_take_2() {
     let take = 2;
     let f = std::fs::read(std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START)).unwrap();
 
-    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip)).unwrap();
+    let (p, last_trailer_idx) = decode_events_take_n(&f, take, Some(skip), None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
@@ -373,7 +373,7 @@ fn test_decode_split_events_with_remainder() {
     let take = 100;
     let f = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
 
-    assert!(decode_events_take_n(&f, take, None).is_err());
+    assert!(decode_events_take_n(&f, take, None, None).is_err());
 
     let (packets, remainder) = decode_events_skip_n_take_all_with_remainder(&f, 0).unwrap();
 

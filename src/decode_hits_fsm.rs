@@ -354,7 +354,7 @@ fn add_data2(moss_hits: &mut [MossHit], data2: u8) {
 mod tests {
     use super::*;
     use crate::moss_protocol::test_util::*;
-    use crate::rust_only::extract_packet;
+    use crate::rust_only::extract_packet_from_buf;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn test_extract_packet() {
         let packet = fake_event_simple();
-        let p = extract_packet(&packet);
+        let p = extract_packet_from_buf(&packet, None);
         println!("{p:?}");
         assert!(p.is_ok());
         let (p, trailer_idx) = p.unwrap();
@@ -441,7 +441,7 @@ mod tests {
     fn test_protocol_error() {
         let packet = fake_event_protocol_error();
 
-        if let Err(e) = extract_packet(&packet) {
+        if let Err(e) = extract_packet_from_buf(&packet, None) {
             println!("{e:?}");
         } else {
             panic!("Expected error, got OK")
