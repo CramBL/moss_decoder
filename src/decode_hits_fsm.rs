@@ -9,10 +9,10 @@ use crate::MossHit;
 sm::sm! {
 
     MossDataFSM {
-        InitialStates { _REGION_HEADER0_ }
+        InitialStates { _UNIT_FRAME_HEADER_ }
 
         _Data {
-            _REGION_HEADER0_ => DATA0_
+            REGION_HEADER0_ => DATA0_
             REGION_HEADER1_ => DATA0_
             REGION_HEADER2_ => DATA0_
             REGION_HEADER3_ => DATA0_
@@ -27,28 +27,38 @@ sm::sm! {
         }
 
         _RegionHeader0 {
-            _REGION_HEADER0_ => _REGION_HEADER0_
+            _UNIT_FRAME_HEADER_ => REGION_HEADER0_
         }
 
         _RegionHeader1 {
-            _REGION_HEADER0_ => REGION_HEADER1_
+            _UNIT_FRAME_HEADER_ => REGION_HEADER1_
+            REGION_HEADER0_ => REGION_HEADER1_
             DATA2_ => REGION_HEADER1_
             IDLE_ => REGION_HEADER1_
         }
 
         _RegionHeader2 {
+            _UNIT_FRAME_HEADER_ => REGION_HEADER2_
+            REGION_HEADER0_ => REGION_HEADER2_
             REGION_HEADER1_ => REGION_HEADER2_
             DATA2_ => REGION_HEADER2_
             IDLE_ => REGION_HEADER2_
         }
 
         _RegionHeader3 {
+            _UNIT_FRAME_HEADER_ => REGION_HEADER3_
+            REGION_HEADER0_ => REGION_HEADER3_
+            REGION_HEADER1_ => REGION_HEADER3_
             REGION_HEADER2_ => REGION_HEADER3_
             DATA2_ => REGION_HEADER3_
             IDLE_ => REGION_HEADER3_
         }
 
         _FrameTrailer {
+            _UNIT_FRAME_HEADER_ => FRAME_TRAILER_
+            REGION_HEADER0_ => FRAME_TRAILER_
+            REGION_HEADER1_ => FRAME_TRAILER_
+            REGION_HEADER2_ => FRAME_TRAILER_
             REGION_HEADER3_ => FRAME_TRAILER_
             DATA2_ => FRAME_TRAILER_
             IDLE_ => FRAME_TRAILER_
@@ -74,7 +84,7 @@ pub(crate) fn extract_hits<'a>(
               + std::iter::ExactSizeIterator),
 ) -> Result<Vec<MossHit>, ParseError> {
     let total_bytes = bytes.len();
-    let mut sm = MossDataFSM::Machine::new(_REGION_HEADER0_).as_enum();
+    let mut sm = MossDataFSM::Machine::new(_UNIT_FRAME_HEADER_).as_enum();
     let mut hits = Vec::<MossHit>::new();
 
     let mut is_trailer_seen = false;
@@ -82,30 +92,61 @@ pub(crate) fn extract_hits<'a>(
 
     for (i, b) in bytes.enumerate() {
         sm = match sm {
-            Initial_REGION_HEADER0_(st) => match *b {
-                REGION_HEADER0 => st.transition(_RegionHeader0).as_enum(),
+            Initial_UNIT_FRAME_HEADER_(st) => match *b {
+                REGION_HEADER0 => {
+                    current_region = 0;
+                    st.transition(_RegionHeader0).as_enum()
+                }
+                REGION_HEADER1 => {
+                    current_region = 1;
+                    st.transition(_RegionHeader1).as_enum()
+                }
+                REGION_HEADER2 => {
+                    current_region = 2;
+                    st.transition(_RegionHeader2).as_enum()
+                }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
+                }
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected REGION_HEADER_1",
+                        "Expected REGION_HEADER_{1-3}/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }
             },
-            _REGION_HEADER0_By_RegionHeader0(st) => match *b {
+            REGION_HEADER0_By_RegionHeader0(st) => match *b {
                 REGION_HEADER1 => {
                     current_region = 1;
                     st.transition(_RegionHeader1).as_enum()
+                }
+                REGION_HEADER2 => {
+                    current_region = 2;
+                    st.transition(_RegionHeader2).as_enum()
+                }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
                 }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 0;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected REGION_HEADER_1/DATA_0",
+                        "Expected REGION_HEADER_{1-3}/DATA_0/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }
@@ -159,7 +200,7 @@ pub(crate) fn extract_hits<'a>(
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected REGION_HEADER_{1-3}/DATA_0/IDLE",
+                        "Expected REGION_HEADER_{1-3}/DATA_0/IDLE/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }
@@ -188,7 +229,7 @@ pub(crate) fn extract_hits<'a>(
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected REGION_HEADER_{1-3}/DATA_0/IDLE",
+                        "Expected REGION_HEADER_{1-3}/DATA_0/IDLE/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }
@@ -198,15 +239,23 @@ pub(crate) fn extract_hits<'a>(
                     current_region = 2;
                     st.transition(_RegionHeader2).as_enum()
                 }
+                REGION_HEADER3 => {
+                    current_region = 3;
+                    st.transition(_RegionHeader3).as_enum()
+                }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 1;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected REGION_HEADER_2/DATA_0",
+                        "Expected REGION_HEADER_{2-3}/DATA_0/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }
@@ -221,28 +270,32 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected REGION_HEADER_3/DATA_0",
+                        "Expected REGION_HEADER_3/DATA_0/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }
             },
             REGION_HEADER3_By_RegionHeader3(st) => match *b {
-                MossWord::UNIT_FRAME_TRAILER => {
-                    is_trailer_seen = true;
-                    break;
-                }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
                     current_region = 3;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
+                MossWord::UNIT_FRAME_TRAILER => {
+                    is_trailer_seen = true;
+                    break;
+                }
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected UNIT_FRAME_TRAILER/DATA_0",
+                        "Expected UNIT_FRAME_TRAILER/DATA_0/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }

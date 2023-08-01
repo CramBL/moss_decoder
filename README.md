@@ -159,13 +159,19 @@ stateDiagram-v2
 
   [*] --> region_header0
   region_header0 --> region_header1
+  region_header0 --> region_header2
+  region_header0 --> region_header3
   region_header0 --> DATA
+  region_header0 --> [*]
   DATA --> region_header1
   region_header1 --> region_header2
+  region_header1 --> region_header3
   region_header1 --> DATA
+  region_header1 --> [*]
   DATA --> region_header2
   region_header2 --> region_header3
   region_header2 --> DATA
+  region_header2 --> [*]
   DATA --> region_header3
   region_header3 --> DATA
   DATA --> [*]
@@ -173,7 +179,6 @@ stateDiagram-v2
 
 
     state DATA {
-      direction LR
       [*] --> data_0
       data_0 --> data_1
       data_1 --> data_2
