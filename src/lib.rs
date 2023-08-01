@@ -49,7 +49,7 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 const READER_BUFFER_CAPACITY: usize = 10 * 1024 * 1024; // 10 MiB
-const MINIMUM_EVENT_SIZE: usize = 6;
+const MINIMUM_EVENT_SIZE: usize = 2;
 
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte.
 /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
