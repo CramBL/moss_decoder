@@ -31,6 +31,7 @@ use pyo3::prelude::*;
 pub mod moss_protocol;
 pub use moss_protocol::MossHit;
 pub mod decode_hits_fsm;
+pub(crate) mod parse_error;
 
 /// A Python module for decoding raw MOSS data effeciently in Rust.
 #[pymodule]
@@ -174,12 +175,14 @@ pub fn decode_events_skip_n_take_m(
                 last_trailer_idx += header_idx + trailer_idx + 1;
             } else {
                 return Err(PyAssertionError::new_err(format!(
-                    "No Unit Frame Trailer found for packet {i}",
+                    "No Unit Frame Trailer found for packet {packet_cnt}",
+                    packet_cnt = i + 1
                 )));
             }
         } else {
             return Err(PyAssertionError::new_err(format!(
-                "No Unit Frame Header found for packet {i}"
+                "No Unit Frame Header found for packet {packet_cnt}",
+                packet_cnt = i + 1
             )));
         }
     }
@@ -192,7 +195,8 @@ pub fn decode_events_skip_n_take_m(
             }
             Err(e) => {
                 return Err(PyAssertionError::new_err(format!(
-                    "Decoding packet {i} failed with: {e}",
+                    "Decoding packet {packet_cnt} failed with: {e}",
+                    packet_cnt = i + 1
                 )))
             }
         }
@@ -211,6 +215,7 @@ mod rust_only {
 
     use crate::decode_hits_fsm::extract_hits;
     use crate::moss_protocol::MossWord;
+    use crate::parse_error::{ParseError, ParseErrorKind};
     use crate::MossPacket;
 
     /// Functions that are only used in Rust and not exposed to Python.
@@ -237,7 +242,7 @@ mod rust_only {
     /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
     /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
     #[inline]
-    pub(crate) fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), Box<str>> {
+    pub(crate) fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), ParseError> {
         if let Some(header_idx) = bytes
             .iter()
             .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
@@ -251,12 +256,18 @@ mod rust_only {
                     },
                     bytes.len() - bytes_iter.len() - 1,
                 )),
-                Err((err_str, err_idx)) => {
-                    Err(format_error_msg(err_str, err_idx + 1, &bytes[header_idx..]).into())
-                }
+                Err(e) => Err(ParseError::new(
+                    e.kind(),
+                    &format_error_msg(&e.to_string(), e.err_index() + 1, &bytes[header_idx..]),
+                    header_idx + e.err_index() + 1,
+                )),
             }
         } else {
-            Err("No Unit Frame Header found".into())
+            Err(ParseError::new(
+                ParseErrorKind::NoHeaderFound,
+                "No Unit Frame Header found",
+                0,
+            ))
         }
     }
 
