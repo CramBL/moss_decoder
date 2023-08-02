@@ -4,6 +4,9 @@ use moss_decoder::*;
 use pretty_assertions::assert_eq;
 
 const FILE_MOSS_NOISE: &str = "tests/test-data/moss_noise.raw";
+const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
+const FILE_NOISE_RANDOM_REGION: &str = "tests/test-data/noise_random_region.raw";
+const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw";
 
 #[test]
 fn test_decoding_single_event() {
