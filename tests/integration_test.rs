@@ -170,6 +170,27 @@ fn test_decode_from_file() {
 }
 
 #[test]
+fn test_decode_from_file_noise_all_region() {
+    let expect_packets = 1000;
+    let expect_hits = 6085;
+
+    let packets =
+        moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.to_string().into()).unwrap();
+    assert_eq!(
+        packets.len(),
+        expect_packets,
+        "Expected {expect_packets} packets, got {}",
+        packets.len()
+    );
+    // Count total hits
+    let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, expect_hits,
+        "Expected {expect_hits} hits, got {total_hits}",
+    );
+}
+
+#[test]
 fn test_decode_protocol_error() {
     pyo3::prepare_freethreaded_python();
 
