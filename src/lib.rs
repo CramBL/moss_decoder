@@ -133,7 +133,6 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
 
     let mut buf = vec![0; READER_BUFFER_CAPACITY];
     let mut bytes_to_decode = Vec::with_capacity(READER_BUFFER_CAPACITY);
-
     while let Ok(bytes_read) = reader.read(&mut buf) {
         if bytes_read == 0 {
             break;
@@ -145,7 +144,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
         bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
 
         // Decode the bytes one event at a time until there's no more events to decode
-        while last_trailer_idx < bytes_read - MINIMUM_EVENT_SIZE - 1 {
+        loop {
             match rust_only::extract_packet_from_buf(&bytes_to_decode[last_trailer_idx..], None) {
                 Ok((moss_packet, trailer_idx)) => {
                     moss_packets.push(moss_packet);
@@ -154,10 +153,16 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
                 Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
                     break;
                 }
+                Err(e) if e.kind() == ParseErrorKind::NoHeaderFound => {
+                    if moss_packets.is_empty() {
+                        return Err(PyAssertionError::new_err(format!("Decoding failed: {e}")));
+                    } else {
+                        break;
+                    }
+                }
                 Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
             }
         }
-
         // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
         bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
     }
