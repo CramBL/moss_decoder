@@ -3,6 +3,7 @@ from python and allows benchmarks."""
 import sys  # Don't want to depend on `argparse`
 import time
 from pathlib import Path
+from typing import Optional
 import moss_decoder
 from moss_decoder import MossPacket, MossHit
 from moss_decoder import decode_event
@@ -16,11 +17,11 @@ FILE_3_EVENTS_PARTIAL_START = Path("tests/test-data/moss_noise_500-999b.raw")
 
 
 class MockMossDecoder:
-    _data_files: list[Path] = None
+    _data_files: Optional[list[Path]] = None
     _current_file_idx = 0
     _current_file_events_decoded = 0
 
-    def __init__(self, data_files: list[Path]) -> "MockMossDecoder":
+    def __init__(self, data_files: Optional[list[Path]] = None) -> "MockMossDecoder":
         self._data_files = data_files
 
     def get_next_n_events(self, events: int) -> list[MossPacket]:
@@ -79,6 +80,19 @@ class MockMossDecoder:
             packets.extend(rest_of_packets)
             return packets
 
+    def decode_from_file(self, file_path: Path) -> list[MossPacket]:
+        """Decode raw MOSS readout data `MossPacket` objects from a file
+        and return list of `MossPacket` objects"""
+        assert isinstance(
+            file_path, Path
+        ), f'Argument must be type Path, got {type(file_path)}. \
+    Supply the file path with: Path("path/to/file")'
+        assert file_path.is_file(), f"File does not exist: {file_path}"
+
+        packets = moss_decoder.decode_from_file(file_path)
+
+        return packets
+
 
 def read_bytes_from_file(file_path: Path) -> bytes:
     """Open file at `file_path` and read as binary, return `bytes`"""
@@ -116,6 +130,34 @@ def make_simple_moss_event_packet() -> bytes:
         + padding
     )
     return simple_packet
+
+
+def test_decode_100mb_file(file_path: Path, expect_packets: int):
+    big_file = Path("100mb-data.raw")
+    if big_file.exists():
+        big_file.unlink()
+    # Read the content of the input binary file
+    with open(file_path, "rb") as input_file:
+        content = input_file.read()
+
+    # Append the content multiple times to the output binary file
+    with open(big_file, "ab") as output_file:
+        for _ in range(10):
+            output_file.write(content)
+    start = time.time()
+    test_decode_all_from_file(file_path=big_file, expect_packets=expect_packets * 10)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+    big_file.unlink()
+
+
+def test_decode_all_from_file(file_path: Path, expect_packets: int):
+    decoder = MockMossDecoder()
+    print(f"Decoding all from file {file_path}")
+    packets = decoder.decode_from_file(file_path)
+    assert (
+        len(packets) == expect_packets
+    ), f"Expected {expect_packets}, got {len(packets)}"
+    print("==> Test OK")
 
 
 def test_decode_partial_events_from_two_files():
@@ -284,6 +326,22 @@ if __name__ == "__main__":
     test_decode_partial_events_from_two_files()
 
     start = time.time()
+    test_decode_all_from_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_all_from_file(file_path=FILE_NOISE_RANDOM_REGION, expect_packets=1044)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_all_from_file(file_path=FILE_PATTERN_ALL_REGIONS, expect_packets=1000)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_all_from_file(file_path=FILE_MOSS_NOISE_ALL_REGION, expect_packets=1000)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
     test_decode_multi_event(path=FILE_MOSS_NOISE, expect_remainder_bytes=1)
     print(f"Done in: {time.time()-start:.3f} s\n")
 
@@ -302,6 +360,8 @@ if __name__ == "__main__":
     start = time.time()
     test_moss_packet_print()
     print(f"Done in: {time.time()-start:.3f} s\n")
+
+    test_decode_100mb_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
 
     start = time.time()
     test_100k_single_decodes()
