@@ -152,10 +152,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
                     last_trailer_idx += trailer_idx + 1;
                 }
                 Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
-                    return Err(PyBytesWarning::new_err(format!(
-                        "Failed decoding packet #{packet_cnt}: {e}",
-                        packet_cnt = moss_packets.len() + 1
-                    )));
+                    break;
                 }
                 Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
             }
