@@ -21,13 +21,12 @@
     clippy::maybe_infinite_iter
 )]
 
-use std::io::Read;
-
 pub use moss_protocol::MossPacket;
 use parse_error::ParseErrorKind;
 use parse_util::find_trailer_n_idx;
 use pyo3::exceptions::{PyAssertionError, PyBytesWarning, PyFileNotFoundError, PyValueError};
 use pyo3::prelude::*;
+use std::io::Read;
 
 pub mod moss_protocol;
 pub use moss_protocol::MossHit;
@@ -50,6 +49,15 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
+#[allow(non_camel_case_types)]
+type List_MossPackets = Vec<MossPacket>;
+
+#[allow(non_camel_case_types)]
+type Tuple_MossPacket_LastTrailerIdx = (MossPacket, usize);
+
+#[allow(non_camel_case_types)]
+type Tuple_List_MossPackets_LastTrailerIdx = (List_MossPackets, usize);
+
 const READER_BUFFER_CAPACITY: usize = 10 * 1024 * 1024; // 10 MiB
 const MINIMUM_EVENT_SIZE: usize = 2;
 
@@ -57,7 +65,7 @@ const MINIMUM_EVENT_SIZE: usize = 2;
 /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
 /// the call should be enclosed in a try/catch.
 #[pyfunction]
-pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
+pub fn decode_event(bytes: &[u8]) -> PyResult<Tuple_MossPacket_LastTrailerIdx> {
     let byte_cnt = bytes.len();
 
     if byte_cnt < MINIMUM_EVENT_SIZE {
@@ -75,7 +83,7 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<(MossPacket, usize)> {
 #[pyfunction]
 /// Decodes multiple MOSS events into a list of [MossPacket]s.
 /// This function is optimized for speed and memory usage.
-pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)> {
+pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<Tuple_List_MossPackets_LastTrailerIdx> {
     let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
 
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
@@ -105,13 +113,13 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<(Vec<MossPacket>, usize)
     }
 }
 
-#[pyfunction]
 /// Decodes a file containing raw MOSS data into a list of [MossPacket]s.
 ///
 /// The file is read in chunks of 10 MiB until the end of the file is reached.
 /// If any errors are encountered while reading the file, any successfully decoded events are returned.
 /// There's no attempt to run over errors.
-pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
+#[pyfunction]
+pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> {
     // Open file (get file descriptor)
     let file = match std::fs::File::open(path) {
         Ok(file) => file,
@@ -164,17 +172,17 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
     }
 }
 
-#[pyfunction]
 /// Decodes N events from the given bytes.
 /// Optionally allows for either:
 /// - skipping `skip` events before decoding.
 /// - prepending `prepend_buffer` to the bytes before decoding.
+#[pyfunction]
 pub fn decode_n_events(
     bytes: &[u8],
     take: usize,
     skip: Option<usize>,
     mut prepend_buffer: Option<Vec<u8>>,
-) -> PyResult<(Vec<MossPacket>, usize)> {
+) -> PyResult<Tuple_List_MossPackets_LastTrailerIdx> {
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(take);
 
     // Skip N events
@@ -221,12 +229,15 @@ pub fn decode_n_events(
     }
 }
 
-#[pyfunction]
+#[allow(non_camel_case_types)]
+type Remainder_Bytes = Vec<u8>;
+
 /// Skips N events in the given bytes and decode as many packets as possible until end of buffer, if the end of the buffer contains a partial event, those bytes are returned as a remainder.
+#[pyfunction]
 pub fn skip_n_take_all(
     bytes: &[u8],
     skip: usize,
-) -> PyResult<(Option<Vec<MossPacket>>, Option<Vec<u8>>)> {
+) -> PyResult<(Option<List_MossPackets>, Option<Remainder_Bytes>)> {
     let mut moss_packets: Vec<MossPacket> = Vec::new();
     let mut remainder: Option<Vec<u8>> = None;
 
@@ -270,7 +281,7 @@ mod rust_only {
     use crate::decode_hits_fsm::extract_hits;
     use crate::moss_protocol::MossWord;
     use crate::parse_error::{ParseError, ParseErrorKind};
-    use crate::MossPacket;
+    use crate::{MossPacket, Tuple_MossPacket_LastTrailerIdx};
 
     /// Functions that are only used in Rust and not exposed to Python.
 
@@ -296,7 +307,7 @@ mod rust_only {
     /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
     /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
     #[inline]
-    fn extract_packet(bytes: &[u8]) -> Result<(MossPacket, usize), ParseError> {
+    fn extract_packet(bytes: &[u8]) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
         if let Some(header_idx) = bytes
             .iter()
             .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
@@ -331,7 +342,7 @@ mod rust_only {
     pub(crate) fn extract_packet_from_buf(
         bytes: &[u8],
         prepend_bytes: Option<Vec<u8>>,
-    ) -> Result<(MossPacket, usize), ParseError> {
+    ) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
         // Collect bytes from `bytes` until a header is seen
 
         if let Some(mut prepend) = prepend_bytes {
