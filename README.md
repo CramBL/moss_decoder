@@ -108,6 +108,7 @@ stateDiagram-v2
     [*] --> frame_header
 
     frame_header --> region_header
+    frame_header --> frame_trailer
 
     region_header --> region_header
     region_header --> frame_trailer
@@ -128,6 +129,7 @@ stateDiagram-v2
 
 
     idle --> DATA
+    idle --> idle
     idle --> frame_trailer
 
     frame_trailer --> [*]
