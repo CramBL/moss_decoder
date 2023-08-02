@@ -229,7 +229,7 @@ pub fn decode_events_take_n(
 pub fn decode_events_skip_n_take_all_with_remainder(
     bytes: &[u8],
     skip: usize,
-) -> PyResult<(Vec<MossPacket>, Option<Vec<u8>>)> {
+) -> PyResult<(Option<Vec<MossPacket>>, Option<Vec<u8>>)> {
     let mut moss_packets: Vec<MossPacket> = Vec::new();
     let mut remainder: Option<Vec<u8>> = None;
 
@@ -260,9 +260,9 @@ pub fn decode_events_skip_n_take_all_with_remainder(
     }
 
     if moss_packets.is_empty() {
-        Ok((Vec::with_capacity(0), remainder))
+        Ok((None, remainder))
     } else {
-        Ok((moss_packets, remainder))
+        Ok((Some(moss_packets), remainder))
     }
 }
 

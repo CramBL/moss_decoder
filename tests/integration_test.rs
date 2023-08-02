@@ -378,6 +378,7 @@ fn test_decode_split_events_with_remainder() {
     let (packets, remainder) = decode_events_skip_n_take_all_with_remainder(&f, 0).unwrap();
 
     let remainder = remainder.unwrap();
+    let packets = packets.unwrap();
 
     println!("Got: {packets} packets", packets = packets.len());
     println!("Remainder: {remainder} bytes", remainder = remainder.len());
@@ -397,7 +398,7 @@ fn test_decode_split_events_from_both_files() {
 
     // Then fall back to decoding as many as possible and returning the remainder
     let (packets, remainder) = decode_events_skip_n_take_all_with_remainder(&f, 0).unwrap();
-
+    let packets = packets.unwrap();
     let decoded_packets = packets.len();
 
     // Now take the rest from the remainder and the next file
