@@ -157,6 +157,7 @@ direction LR
     [*] --> frame_header
 
     frame_header --> HITS
+    frame_header --> frame_trailer
 
     state HITS {
       [*] --> [*] : decode hits
