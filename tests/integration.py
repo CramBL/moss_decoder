@@ -140,7 +140,7 @@ def test_decode_partial_events_from_two_files():
     print("==> Test OK\n\n")
 
 
-def test_decode_multi_event(path: Path):
+def test_decode_multi_event(path: Path, expect_remainder_bytes: int):
     """Test that multiple events are correctly decoded from raw bytes"""
     print("=== Test multiple events are correctly decoded from raw bytes ===")
     raw_bytes = read_bytes_from_file(path)
@@ -161,8 +161,8 @@ def test_decode_multi_event(path: Path):
         print(f"Remainder byte(s): {raw_bytes[last_trailer_idx+1:]}")
 
     assert (
-        remainder_count == 1
-    ), f"Expected last trailer found at index 1, got: {remainder_count}"
+        remainder_count == expect_remainder_bytes
+    ), f"Expected last trailer found {expect_remainder_bytes} bytes before last byte, got: {remainder_count}"
     print("==> Test OK\n\n")
 
 
@@ -277,22 +277,26 @@ if __name__ == "__main__":
     if len(args) > 1:
         if args[1] == "benchmark":
             # Just run this and then exit
-            test_decode_multi_event(path=FILE_MOSS_NOISE)
+            test_decode_multi_event(path=FILE_MOSS_NOISE, expect_remainder_bytes=1)
             sys.exit(0)
 
     test_fundamental_class_comparisons()
     test_decode_partial_events_from_two_files()
 
     start = time.time()
-    test_decode_multi_event(path=FILE_MOSS_NOISE)
+    test_decode_multi_event(path=FILE_MOSS_NOISE, expect_remainder_bytes=1)
     print(f"Done in: {time.time()-start:.3f} s\n")
 
     start = time.time()
-    test_decode_multi_event(path=FILE_MOSS_NOISE)
+    test_decode_multi_event(path=FILE_MOSS_NOISE_ALL_REGION, expect_remainder_bytes=1)
     print(f"Done in: {time.time()-start:.3f} s\n")
 
     start = time.time()
-    test_decode_multi_event(path=FILE_MOSS_NOISE)
+    test_decode_multi_event(path=FILE_NOISE_RANDOM_REGION, expect_remainder_bytes=3)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_multi_event(path=FILE_PATTERN_ALL_REGIONS, expect_remainder_bytes=2)
     print(f"Done in: {time.time()-start:.3f} s\n")
 
     start = time.time()
