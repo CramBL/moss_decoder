@@ -3,6 +3,13 @@ use moss_decoder::*;
 
 use pretty_assertions::assert_eq;
 
+const FILE_MOSS_NOISE: &str = "tests/test-data/moss_noise.raw";
+const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
+const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
+const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
+const FILE_NOISE_RANDOM_REGION: &str = "tests/test-data/noise_random_region.raw";
+const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw";
+
 #[test]
 fn test_decoding_single_event() {
     //
@@ -114,7 +121,7 @@ fn test_read_file_decode() {
     let time = std::time::Instant::now();
 
     println!("Reading file...");
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE)).unwrap();
     println!(
         "Read file in: {t:?}. Bytes: {cnt}",
         t = time.elapsed(),
@@ -144,8 +151,7 @@ fn test_decode_from_file() {
     let expect_packets = 100000;
     let expect_hits = 2716940;
 
-    let packets =
-        moss_decoder::decode_from_file("tests/moss_noise.raw".to_string().into()).unwrap();
+    let packets = moss_decoder::decode_from_file(FILE_MOSS_NOISE.to_string().into()).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets}", packets = packets.len());
@@ -157,6 +163,69 @@ fn test_decode_from_file() {
         packets.len()
     );
 
+    // Count total hits
+    let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, expect_hits,
+        "Expected {expect_hits} hits, got {total_hits}",
+    );
+}
+
+#[test]
+fn test_decode_from_file_noise_all_region() {
+    let expect_packets = 1000;
+    let expect_hits = 6085;
+
+    let packets =
+        moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.to_string().into()).unwrap();
+    assert_eq!(
+        packets.len(),
+        expect_packets,
+        "Expected {expect_packets} packets, got {}",
+        packets.len()
+    );
+    // Count total hits
+    let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, expect_hits,
+        "Expected {expect_hits} hits, got {total_hits}",
+    );
+}
+
+#[test]
+fn test_decode_from_file_noise_random_region() {
+    let expect_packets = 1044;
+    let expect_hits = 5380;
+
+    let packets =
+        moss_decoder::decode_from_file(FILE_NOISE_RANDOM_REGION.to_string().into()).unwrap();
+    assert_eq!(
+        packets.len(),
+        expect_packets,
+        "Expected {expect_packets} packets, got {}",
+        packets.len()
+    );
+    // Count total hits
+    let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, expect_hits,
+        "Expected {expect_hits} hits, got {total_hits}",
+    );
+}
+
+#[test]
+fn test_decode_from_file_pattern_all_region() {
+    let expect_packets = 1000;
+    let expect_hits = 4000;
+
+    let packets =
+        moss_decoder::decode_from_file(FILE_PATTERN_ALL_REGIONS.to_string().into()).unwrap();
+    assert_eq!(
+        packets.len(),
+        expect_packets,
+        "Expected {expect_packets} packets, got {}",
+        packets.len()
+    );
     // Count total hits
     let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
     assert_eq!(
@@ -192,7 +261,7 @@ fn test_decode_multiple_events_fsm() {
     println!("Reading file...");
     let time = std::time::Instant::now();
 
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE)).unwrap();
     println!(
         "Read file in: {t:?}. Bytes: {cnt}",
         t = time.elapsed(),
@@ -233,8 +302,7 @@ fn test_decode_from_file_fsm() {
     let expect_packets = 100000;
     let expect_hits = 2716940;
 
-    let packets =
-        moss_decoder::decode_from_file("tests/moss_noise.raw".to_string().into()).unwrap();
+    let packets = moss_decoder::decode_from_file(FILE_MOSS_NOISE.to_string().into()).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets}", packets = packets.len());
@@ -276,7 +344,7 @@ fn test_decode_protocol_error_fsm() {
 #[test]
 fn test_decode_events_skip_0_take_10() {
     let take = 10;
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE)).unwrap();
     let (p, last_trailer_idx) = decode_n_events(&f, take, None, None).unwrap();
 
     println!("Got: {packets} packets", packets = p.len());
@@ -288,7 +356,7 @@ fn test_decode_events_skip_0_take_10() {
 fn test_decode_events_skip_10_take_1() {
     let skip = 10;
     let take = 1;
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE)).unwrap();
 
     let (p, last_trailer_idx) = decode_n_events(&f, take, Some(skip), None).unwrap();
 
@@ -301,7 +369,7 @@ fn test_decode_events_skip_10_take_1() {
 fn test_decode_events_skip_500_take_100() {
     let skip = 500;
     let take = 100;
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE)).unwrap();
 
     let (p, last_trailer_idx) = decode_n_events(&f, take, Some(skip), None).unwrap();
 
@@ -314,16 +382,13 @@ fn test_decode_events_skip_500_take_100() {
 fn test_decode_events_skip_99000_take_1000() {
     let skip = 99000;
     let take = 1000;
-    let f = std::fs::read(std::path::PathBuf::from("tests/moss_noise.raw")).unwrap();
+    let f = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE)).unwrap();
 
     let (p, last_trailer_idx) = decode_n_events(&f, take, Some(skip), None).unwrap();
     println!("Got: {packets} packets", packets = p.len());
     println!("Last trailer at index: {last_trailer_idx}");
     assert_eq!(p.len(), take, "Expected {take} packets, got {}", p.len());
 }
-
-const FILE_4_EVENTS_PARTIAL_END: &str = "tests/moss_noise_0-499b.raw";
-const FILE_3_EVENTS_PARTIAL_START: &str = "tests/moss_noise_500-999b.raw";
 
 #[test]
 #[should_panic = "Failed decoding packet #5"]

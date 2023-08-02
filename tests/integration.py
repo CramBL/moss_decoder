@@ -7,9 +7,12 @@ import moss_decoder
 from moss_decoder import MossPacket, MossHit
 from moss_decoder import decode_event
 
-FILE_PATH = Path("tests/moss_noise.raw")
-FILE_4_EVENTS_PARTIAL_END = Path("tests/moss_noise_0-499b.raw")
-FILE_3_EVENTS_PARTIAL_START = Path("tests/moss_noise_500-999b.raw")
+FILE_MOSS_NOISE = Path("tests/test-data/moss_noise.raw")
+FILE_MOSS_NOISE_ALL_REGION = Path("tests/test-data/noise_all_regions.raw")
+FILE_NOISE_RANDOM_REGION = Path("tests/test-data/noise_random_region.raw")
+FILE_PATTERN_ALL_REGIONS = Path("tests/test-data/pattern_all_regions.raw")
+FILE_4_EVENTS_PARTIAL_END = Path("tests/test-data/moss_noise_0-499b.raw")
+FILE_3_EVENTS_PARTIAL_START = Path("tests/test-data/moss_noise_500-999b.raw")
 
 
 class MockMossDecoder:
@@ -137,10 +140,10 @@ def test_decode_partial_events_from_two_files():
     print("==> Test OK\n\n")
 
 
-def test_decode_multi_event():
+def test_decode_multi_event(path: Path, expect_remainder_bytes: int):
     """Test that multiple events are correctly decoded from raw bytes"""
     print("=== Test multiple events are correctly decoded from raw bytes ===")
-    raw_bytes = read_bytes_from_file(FILE_PATH)
+    raw_bytes = read_bytes_from_file(path)
     byte_count = len(raw_bytes)
     last_byte_idx = byte_count - 1
 
@@ -158,8 +161,8 @@ def test_decode_multi_event():
         print(f"Remainder byte(s): {raw_bytes[last_trailer_idx+1:]}")
 
     assert (
-        remainder_count == 1
-    ), f"Expected last trailer found at index 1, got: {remainder_count}"
+        remainder_count == expect_remainder_bytes
+    ), f"Expected last trailer found {expect_remainder_bytes} bytes before last byte, got: {remainder_count}"
     print("==> Test OK\n\n")
 
 
@@ -191,7 +194,7 @@ def test_100k_single_decodes():
 
     print(("=== Test 100k calls to decode_event ==="))
 
-    raw_bytes = read_bytes_from_file(FILE_PATH)
+    raw_bytes = read_bytes_from_file(FILE_MOSS_NOISE)
     byte_count = len(raw_bytes)
     last_byte_idx = byte_count - 1
 
@@ -274,19 +277,32 @@ if __name__ == "__main__":
     if len(args) > 1:
         if args[1] == "benchmark":
             # Just run this and then exit
-            test_decode_multi_event()
+            test_decode_multi_event(path=FILE_MOSS_NOISE, expect_remainder_bytes=1)
             sys.exit(0)
 
     test_fundamental_class_comparisons()
     test_decode_partial_events_from_two_files()
 
     start = time.time()
-    test_decode_multi_event()
+    test_decode_multi_event(path=FILE_MOSS_NOISE, expect_remainder_bytes=1)
     print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_multi_event(path=FILE_MOSS_NOISE_ALL_REGION, expect_remainder_bytes=1)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_multi_event(path=FILE_NOISE_RANDOM_REGION, expect_remainder_bytes=3)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_multi_event(path=FILE_PATTERN_ALL_REGIONS, expect_remainder_bytes=2)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
     start = time.time()
     test_moss_packet_print()
     print(f"Done in: {time.time()-start:.3f} s\n")
+
     start = time.time()
     test_100k_single_decodes()
     print(f"Done in: {time.time()-start:.3f} s\n")
-    start = time.time()

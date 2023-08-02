@@ -1,6 +1,6 @@
 use criterion::Criterion;
 
-const BENCH_FILE_PATH: &str = "tests/moss_noise.raw";
+const BENCH_FILE_PATH: &str = "tests/test-data/moss_noise.raw";
 
 pub fn decode_multiple_events(c: &mut Criterion) {
     let f = std::fs::read(std::path::PathBuf::from(BENCH_FILE_PATH)).unwrap();

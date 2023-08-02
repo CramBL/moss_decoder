@@ -1,6 +1,6 @@
 use criterion::Criterion;
 
-const BENCH_FILE_PATH: &str = "tests/moss_noise.raw";
+const BENCH_FILE_PATH: &str = "tests/test-data/moss_noise.raw";
 
 pub fn decode_from_file(c: &mut Criterion) {
     let mut group = c.benchmark_group("decode_multiple_events_bench");
