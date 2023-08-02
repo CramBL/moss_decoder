@@ -15,7 +15,7 @@ Python package implemented in Rust for high-performance decoding of readout data
   - [Installation](#installation)
     - [Example](#example)
   - [Features](#features)
-    - [3 types of functions are provided](#3-types-of-functions-are-provided)
+    - [5 types of idempotent functions are provided](#5-types-of-idempotent-functions-are-provided)
   - [MOSS event data packet protocol FSM](#moss-event-data-packet-protocol-fsm)
   - [MOSS event data packet decoder FSM](#moss-event-data-packet-decoder-fsm)
   - [Event packet hit decoder FSM](#event-packet-hit-decoder-fsm)
@@ -45,7 +45,7 @@ See [python types](moss_decoder.pyi) for the type information the package expose
 
 Two classes are provided: `MossPacket` & `MossHit`.
 
-### 3 types of functions are provided
+### 5 types of idempotent functions are provided
 ```python
 decode_event(arg: bytes)  -> tuple[MossPacket, int]: ...
 # allows decoding a single event from an iterable of bytes
@@ -53,19 +53,45 @@ decode_event(arg: bytes)  -> tuple[MossPacket, int]: ...
 
 **Returns**: the decoded `MossPacket` and the index the *unit frame trailer* was found. Throws if no valid `MossPacket` is found.
 ```python
-decode_multiple_events(arg: bytes) -> tuple[list[MossPacket], int]: ...
+decode_all_events(arg: bytes) -> tuple[list[MossPacket], int]: ...
 # returns as many `MossPacket`s as can be decoded from the bytes iterable.
 # This is much more effecient than calling `decode_event` multiple times.
 ```
-**Returns**: A list of `MossPacket`s and the index of the last observed *unit frame trailer*. Throws if no valid `MossPacket`s are found.
+**Returns**: A list of `MossPacket`s and the index of the last observed *unit frame trailer*. Throws if no valid `MossPacket`s are found or a protocol error is encountered.
 
 ```python
 decode_from_file(arg: str | Path) -> list[MossPacket]: ...
 # takes a `Path` and returns as many `MossPacket` as can be decoded from file.
 # This is the most effecient way of decoding data from a file.
 ```
-**Returns**: A list of `MossPacket`s. Throws if the file is not found or no valid `MossPacket`s are found.
+**Returns**: A list of `MossPacket`s. Throws if the file is not found, no valid `MossPacket`s are found, or a protocol error is encountered.
 
+```python
+decode_n_events(
+    bytes: bytes,
+    take: int,
+    skip: Optional[int] = None,
+    prepend_buffer: Optional[bytes] = None,
+) -> tuple[list[MossPacket], int]: ...
+# Decode N events from bytes
+# Optionally provide either (not both):
+#    - Skip M events before decoding N events
+#    - Prepend a buffer before decoding N events.
+```
+**Returns**: A list of `MossPacket`s. Throws if the file is not found, no valid `MossPacket`s are found, or a protocol error is encountered.
+
+A `BytesWarning` exception is thrown if the end of the `bytes` is reached while decoding a packet (no trailer is found)
+
+```python
+def skip_n_take_all(
+    bytes: bytes, skip: int = None
+) -> tuple[list[MossPacket], Optional[bytes]]: ...
+# Decode all events, optionally skip N events first.
+# return all decoded events and the remaining bytes after decoding the last MossPacket
+```
+**Returns**: All decoded events and any remaining bytes after the last trailer seen.
+
+Using `decode_n_events` and `skip_n_take_all` it is possible to continuously decode multiple files that potentially ends or starts with partial events.
 
 ## MOSS event data packet protocol FSM
 The a MOSS half-unit event data packet follows the states seen in the FSM below. The region header state is simplified here.
