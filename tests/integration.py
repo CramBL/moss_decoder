@@ -31,7 +31,7 @@ class MockMossDecoder:
                 skip = None
             print(f"Taking {events}, skipping {skip}")
             packets, last_trailer_idx = moss_decoder.decode_events_take_n(
-                bytes=buf, take=events, skip=skip, prepend_buffer=None
+                bytes=buf, take=events, skip=skip
             )
             print(
                 f"Decoded {len(packets)} events, last trailer at index {last_trailer_idx}"
@@ -68,7 +68,6 @@ class MockMossDecoder:
             rest_of_packets, last_trailer_idx = moss_decoder.decode_events_take_n(
                 bytes=buf,
                 take=events - len(packets),
-                skip=None,
                 prepend_buffer=remainder,
             )
             if len(rest_of_packets) != 0:
