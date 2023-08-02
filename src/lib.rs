@@ -282,7 +282,7 @@ mod rust_only {
     pub(super) fn calc_prealloc_val(bytes: &[u8]) -> PyResult<usize> {
         let byte_cnt = bytes.len();
 
-        if byte_cnt < 6 {
+        if byte_cnt < crate::MINIMUM_EVENT_SIZE {
             return Err(PyValueError::new_err(
                 "Received less than the minimum event size",
             ));
