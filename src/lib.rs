@@ -260,7 +260,7 @@ pub fn decode_events_skip_n_take_all_with_remainder(
     }
 
     if moss_packets.is_empty() {
-        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+        Ok((Vec::with_capacity(0), remainder))
     } else {
         Ok((moss_packets, remainder))
     }
