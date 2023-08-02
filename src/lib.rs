@@ -41,11 +41,8 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event, m)?)?;
     m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
     m.add_function(wrap_pyfunction!(decode_from_file, m)?)?;
-    m.add_function(wrap_pyfunction!(decode_events_take_n, m)?)?;
-    m.add_function(wrap_pyfunction!(
-        decode_events_skip_n_take_all_with_remainder,
-        m
-    )?)?;
+    m.add_function(wrap_pyfunction!(decode_n_events, m)?)?;
+    m.add_function(wrap_pyfunction!(skip_n_take_all, m)?)?;
 
     m.add_class::<MossHit>()?;
     m.add_class::<MossPacket>()?;
@@ -172,7 +169,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<Vec<MossPacket>> {
 /// Optionally allows for either:
 /// - skipping `skip` events before decoding.
 /// - prepending `prepend_buffer` to the bytes before decoding.
-pub fn decode_events_take_n(
+pub fn decode_n_events(
     bytes: &[u8],
     take: usize,
     skip: Option<usize>,
@@ -226,7 +223,7 @@ pub fn decode_events_take_n(
 
 #[pyfunction]
 /// Skips N events in the given bytes and decode as many packets as possible until end of buffer, if the end of the buffer contains a partial event, those bytes are returned as a remainder.
-pub fn decode_events_skip_n_take_all_with_remainder(
+pub fn skip_n_take_all(
     bytes: &[u8],
     skip: usize,
 ) -> PyResult<(Option<Vec<MossPacket>>, Option<Vec<u8>>)> {
