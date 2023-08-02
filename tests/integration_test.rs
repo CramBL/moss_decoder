@@ -122,7 +122,7 @@ fn test_read_file_decode() {
     );
 
     println!("Decoding content...");
-    let (p, last_trailer_idx) = decode_multiple_events(&f).unwrap();
+    let (p, last_trailer_idx) = decode_all_events(&f).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets} packets", packets = p.len());
@@ -200,7 +200,7 @@ fn test_decode_multiple_events_fsm() {
     );
 
     println!("Decoding content...");
-    let (p, last_trailer_idx) = decode_multiple_events(&f).unwrap();
+    let (p, last_trailer_idx) = decode_all_events(&f).unwrap();
     println!("Decoded in: {t:?}\n", t = time.elapsed());
 
     println!("Got: {packets} packets", packets = p.len());

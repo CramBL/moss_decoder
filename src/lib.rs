@@ -38,7 +38,7 @@ pub(crate) mod parse_util;
 #[pymodule]
 fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(decode_event, m)?)?;
-    m.add_function(wrap_pyfunction!(decode_multiple_events, m)?)?;
+    m.add_function(wrap_pyfunction!(decode_all_events, m)?)?;
     m.add_function(wrap_pyfunction!(decode_from_file, m)?)?;
     m.add_function(wrap_pyfunction!(decode_n_events, m)?)?;
     m.add_function(wrap_pyfunction!(skip_n_take_all, m)?)?;
@@ -63,7 +63,7 @@ const MINIMUM_EVENT_SIZE: usize = 2;
 
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte.
 /// This function returns an error if no MOSS packet is found, therefor if there's any chance the argument does not contain a valid `MossPacket`
-/// the call should be enclosed in a try/catch.
+/// the call should be enclosed in a try/except.
 #[pyfunction]
 pub fn decode_event(bytes: &[u8]) -> PyResult<Tuple_MossPacket_LastTrailerIdx> {
     let byte_cnt = bytes.len();
@@ -81,9 +81,9 @@ pub fn decode_event(bytes: &[u8]) -> PyResult<Tuple_MossPacket_LastTrailerIdx> {
 }
 
 #[pyfunction]
-/// Decodes multiple MOSS events into a list of [MossPacket]s.
-/// This function is optimized for speed and memory usage.
-pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<Tuple_List_MossPackets_LastTrailerIdx> {
+/// Decodes as many MOSS events as possible into a list of [MossPacket]s.
+/// Optimized for speed and memory usage.
+pub fn decode_all_events(bytes: &[u8]) -> PyResult<Tuple_List_MossPackets_LastTrailerIdx> {
     let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
 
     let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
@@ -116,7 +116,7 @@ pub fn decode_multiple_events(bytes: &[u8]) -> PyResult<Tuple_List_MossPackets_L
 /// Decodes a file containing raw MOSS data into a list of [MossPacket]s.
 ///
 /// The file is read in chunks of 10 MiB until the end of the file is reached.
-/// If any errors are encountered while reading the file, any successfully decoded events are returned.
+/// If any errors are encountered while reading the file, an exception is thrown.
 /// There's no attempt to run over errors.
 #[pyfunction]
 pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> {
@@ -173,7 +173,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
 }
 
 /// Decodes N events from the given bytes.
-/// Optionally allows for either:
+/// Optionally allows for either (not both):
 /// - skipping `skip` events before decoding.
 /// - prepending `prepend_buffer` to the bytes before decoding.
 #[pyfunction]
@@ -232,7 +232,13 @@ pub fn decode_n_events(
 #[allow(non_camel_case_types)]
 type Remainder_Bytes = Vec<u8>;
 
-/// Skips N events in the given bytes and decode as many packets as possible until end of buffer, if the end of the buffer contains a partial event, those bytes are returned as a remainder.
+/// Skips N events in the given bytes and decode as many packets as possible until end of buffer,
+/// If any packets are decoded, they are returned as a list of MOSS Packets.
+/// if the end of the buffer contains a partial event, those bytes are returned as a remainder.
+///
+/// Arguments: bytes: `bytes`, skip: `int`
+///
+/// Returns: `Tuple[Optional[List[MossPacket]], Optional[bytes]]`
 #[pyfunction]
 pub fn skip_n_take_all(
     bytes: &[u8],

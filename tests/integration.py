@@ -30,7 +30,7 @@ class MockMossDecoder:
             else:
                 skip = None
             print(f"Taking {events}, skipping {skip}")
-            packets, last_trailer_idx = moss_decoder.decode_events_take_n(
+            packets, last_trailer_idx = moss_decoder.decode_n_events(
                 bytes=buf, take=events, skip=skip
             )
             print(
@@ -45,7 +45,7 @@ class MockMossDecoder:
             (
                 remaining_packets,
                 remainder,
-            ) = moss_decoder.decode_events_skip_n_take_all_with_remainder(
+            ) = moss_decoder.skip_n_take_all(
                 bytes=buf, skip=self._current_file_events_decoded
             )
 
@@ -65,7 +65,7 @@ class MockMossDecoder:
             print(f"Trying to get {events - len(packets)} from second file")
             buf = read_bytes_from_file(self._data_files[self._current_file_idx])
 
-            rest_of_packets, last_trailer_idx = moss_decoder.decode_events_take_n(
+            rest_of_packets, last_trailer_idx = moss_decoder.decode_n_events(
                 bytes=buf,
                 take=events - len(packets),
                 prepend_buffer=remainder,
@@ -146,7 +146,7 @@ def test_decode_multi_event():
 
     print(f"Read {byte_count} bytes")
 
-    packets, last_trailer_idx = moss_decoder.decode_multiple_events(raw_bytes)
+    packets, last_trailer_idx = moss_decoder.decode_all_events(raw_bytes)
 
     print(f"Decoded {len(packets)} packets")
 

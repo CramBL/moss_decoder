@@ -8,7 +8,7 @@ pub fn decode_multiple_events(c: &mut Criterion) {
     let mut group = c.benchmark_group("decode_multiple_events_bench");
     {
         group.bench_function("fsm iterator", |b| {
-            b.iter(|| moss_decoder::decode_multiple_events(&f))
+            b.iter(|| moss_decoder::decode_all_events(&f))
         });
     }
     group.finish();
