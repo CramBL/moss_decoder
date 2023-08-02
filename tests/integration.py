@@ -7,9 +7,9 @@ import moss_decoder
 from moss_decoder import MossPacket, MossHit
 from moss_decoder import decode_event
 
-FILE_PATH = Path("tests/moss_noise.raw")
-FILE_4_EVENTS_PARTIAL_END = Path("tests/moss_noise_0-499b.raw")
-FILE_3_EVENTS_PARTIAL_START = Path("tests/moss_noise_500-999b.raw")
+FILE_PATH = Path("tests/test-data/moss_noise.raw")
+FILE_4_EVENTS_PARTIAL_END = Path("tests/test-data/moss_noise_0-499b.raw")
+FILE_3_EVENTS_PARTIAL_START = Path("tests/test-data/moss_noise_500-999b.raw")
 
 
 class MockMossDecoder:
