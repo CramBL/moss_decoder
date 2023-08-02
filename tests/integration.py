@@ -132,8 +132,8 @@ def make_simple_moss_event_packet() -> bytes:
     return simple_packet
 
 
-def test_decode_100mb_file(file_path: Path, expect_packets: int):
-    big_file = Path("100mb-data.raw")
+def test_decode_1GB_file(file_path: Path, expect_packets: int):
+    big_file = Path("1GB-data.raw")
     if big_file.exists():
         big_file.unlink()
     # Read the content of the input binary file
@@ -142,10 +142,10 @@ def test_decode_100mb_file(file_path: Path, expect_packets: int):
 
     # Append the content multiple times to the output binary file
     with open(big_file, "ab") as output_file:
-        for _ in range(10):
+        for _ in range(100):
             output_file.write(content)
     start = time.time()
-    test_decode_all_from_file(file_path=big_file, expect_packets=expect_packets * 10)
+    test_decode_all_from_file(file_path=big_file, expect_packets=expect_packets * 100)
     print(f"Done in: {time.time()-start:.3f} s\n")
     big_file.unlink()
 
@@ -157,6 +157,7 @@ def test_decode_all_from_file(file_path: Path, expect_packets: int):
     assert (
         len(packets) == expect_packets
     ), f"Expected {expect_packets}, got {len(packets)}"
+    print(f"Got {len(packets)} packets")
     print("==> Test OK")
 
 
@@ -361,7 +362,7 @@ if __name__ == "__main__":
     test_moss_packet_print()
     print(f"Done in: {time.time()-start:.3f} s\n")
 
-    test_decode_100mb_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
+    test_decode_1GB_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
 
     start = time.time()
     test_100k_single_decodes()
