@@ -1,6 +1,7 @@
 """Performant decoding of MOSS readout data implemented in Rust"""
 
 from pathlib import Path
+from typing import Optional
 
 class MossHit:
     """A MOSS hit instance"""
@@ -24,6 +25,15 @@ class MossPacket:
         self.unit_id = unit_id
         self.hits = []
 
-def decode_event(raw_bytes: bytes) -> tuple[MossPacket, int]: ...
-def decode_multiple_events(raw_bytes: bytes) -> tuple[list[MossPacket], int]: ...
+def decode_event(bytes: bytes) -> tuple[MossPacket, int]: ...
+def decode_all_events(bytes: bytes) -> tuple[list[MossPacket], int]: ...
 def decode_from_file(path: str | Path) -> list[MossPacket]: ...
+def decode_n_events(
+    bytes: bytes,
+    take: int,
+    skip: Optional[int] = None,
+    prepend_buffer: Optional[bytes] = None,
+) -> tuple[list[MossPacket], int]: ...
+def skip_n_take_all(
+    bytes: bytes, skip: int = None
+) -> tuple[list[MossPacket], Optional[bytes]]: ...
