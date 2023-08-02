@@ -8,6 +8,9 @@ from moss_decoder import MossPacket, MossHit
 from moss_decoder import decode_event
 
 FILE_MOSS_NOISE = Path("tests/test-data/moss_noise.raw")
+FILE_MOSS_NOISE_ALL_REGION = Path("tests/test-data/noise_all_regions.raw")
+FILE_NOISE_RANDOM_REGION = Path("tests/test-data/noise_random_region.raw")
+FILE_PATTERN_ALL_REGIONS = Path("tests/test-data/pattern_all_regions.raw")
 FILE_4_EVENTS_PARTIAL_END = Path("tests/test-data/moss_noise_0-499b.raw")
 FILE_3_EVENTS_PARTIAL_START = Path("tests/test-data/moss_noise_500-999b.raw")
 
@@ -279,6 +282,14 @@ if __name__ == "__main__":
 
     test_fundamental_class_comparisons()
     test_decode_partial_events_from_two_files()
+
+    start = time.time()
+    test_decode_multi_event(path=FILE_MOSS_NOISE)
+    print(f"Done in: {time.time()-start:.3f} s\n")
+
+    start = time.time()
+    test_decode_multi_event(path=FILE_MOSS_NOISE)
+    print(f"Done in: {time.time()-start:.3f} s\n")
 
     start = time.time()
     test_decode_multi_event(path=FILE_MOSS_NOISE)
