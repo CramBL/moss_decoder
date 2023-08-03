@@ -523,3 +523,27 @@ fn test_decode_split_events_from_path_take_too_many() {
     assert!(res.is_err());
     assert!(res.unwrap_err().to_string().contains("BytesWarning"));
 }
+
+#[test]
+fn test_skip_n_take_all_from_file() {
+    pyo3::prepare_freethreaded_python();
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = skip_n_take_all_from_file(p.clone(), 0);
+    assert!(res.is_ok());
+    let (packets, remainder) = res.unwrap();
+    assert!(packets.is_some());
+    assert!(remainder.is_some());
+    assert_eq!(packets.unwrap().len(), 4);
+    let remainder = remainder.unwrap();
+    println!("Got {} remainder bytes", remainder.len());
+    println!("Got remainder: {:02X?}", remainder);
+
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 1).unwrap();
+    assert_eq!(packets.unwrap().len(), 3);
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 2).unwrap();
+    assert_eq!(packets.unwrap().len(), 2);
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 3).unwrap();
+    assert_eq!(packets.unwrap().len(), 1);
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 4).unwrap();
+    assert!(packets.is_none());
+}
