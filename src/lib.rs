@@ -147,7 +147,7 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
             Ok((extracted_packets, last_trailer_idx)) => {
                 moss_packets.extend(extracted_packets);
                 // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
-                bytes_to_decode = bytes_to_decode[last_trailer_idx + 1..].to_vec();
+                bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
             }
             Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
                 return Err(PyBytesWarning::new_err(format!(
