@@ -355,6 +355,11 @@ pub fn decode_n_events_from_file(
 
     if moss_packets.is_empty() {
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else if moss_packets.len() < take {
+        Err(PyBytesWarning::new_err(format!(
+            "Taking {take} events failed, got {decoded_cnt} events",
+            decoded_cnt = moss_packets.len()
+        )))
     } else {
         moss_packets.truncate(take); // Truncate to the requested number of events
         Ok(moss_packets)
