@@ -142,7 +142,6 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
         bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
 
         // Decode the bytes one event at a time until there's no more events to decode
-
         match rust_only::get_all_hits_from_buf(&bytes_to_decode) {
             Ok((extracted_packets, last_trailer_idx)) => {
                 moss_packets.extend(extracted_packets);
@@ -271,6 +270,94 @@ pub fn skip_n_take_all(
         Ok((None, remainder))
     } else {
         Ok((Some(moss_packets), remainder))
+    }
+}
+
+/// Decodes N events from the given file.
+/// Optionally allows for either (not both):
+/// - skipping `skip` events before decoding.
+/// - prepending `prepend_buffer` to the bytes before decoding.
+///
+/// Arguments: path: `str`, take: `int`, skip: `Optional[int]`, prepend_buffer: `Optional[bytes]`
+/// Returns: `List[MossPacket]`
+#[pyfunction]
+pub fn decode_n_events_from_file(
+    path: std::path::PathBuf,
+    take: usize,
+    skip: Option<usize>,
+    mut prepend_buffer: Option<Vec<u8>>,
+) -> PyResult<List_MossPackets> {
+    // Skip N events
+    if skip.is_some_and(|s| s == 0) {
+        return Err(PyValueError::new_err("skip value must be greater than 0"));
+    } else if skip.is_some() && prepend_buffer.is_some() {
+        return Err(PyValueError::new_err(
+            "skip and prepend_buffer cannot be used together",
+        ));
+    }
+    // Open file (get file descriptor)
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(PyFileNotFoundError::new_err(e.to_string())),
+    };
+
+    // Create buffered reader with 1MB capacity to minimize syscalls to read
+    let mut reader = std::io::BufReader::with_capacity(READER_BUFFER_CAPACITY, file);
+
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(take);
+
+    let mut buf = vec![0; READER_BUFFER_CAPACITY];
+    let mut bytes_to_decode = Vec::with_capacity(READER_BUFFER_CAPACITY);
+    if let Some(prepend_buffer) = prepend_buffer.take() {
+        bytes_to_decode.extend_from_slice(&prepend_buffer);
+    }
+    let mut packets_to_skip = skip.unwrap_or(0);
+
+    while let Ok(bytes_read) = reader.read(&mut buf) {
+        if bytes_read == 0 {
+            break;
+        }
+
+        // Extend bytes_to_decode with the new data
+        bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
+
+        // Decode the bytes one event at a time until there's no more events to decode
+        match rust_only::get_all_hits_from_buf(&bytes_to_decode) {
+            Ok((mut extracted_packets, last_trailer_idx)) => {
+                if packets_to_skip > 0 {
+                    if packets_to_skip > extracted_packets.len() {
+                        packets_to_skip -= extracted_packets.len();
+                        bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
+                        continue;
+                    } else {
+                        for _ in 0..packets_to_skip {
+                            _ = extracted_packets.remove(0);
+                        }
+                        packets_to_skip = 0;
+                    }
+                }
+                moss_packets.extend(extracted_packets);
+                if moss_packets.len() >= take {
+                    break;
+                }
+                // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
+                bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
+            }
+            Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                return Err(PyBytesWarning::new_err(format!(
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + 1
+                )));
+            }
+            Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
+        }
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        moss_packets.truncate(take); // Truncate to the requested number of events
+        Ok(moss_packets)
     }
 }
 

@@ -475,3 +475,36 @@ fn test_decode_split_events_from_both_files() {
     println!("Last trailer at index: {last_trailer_idx}");
     assert_eq!(packets.len() + packets2.len(), take);
 }
+
+#[test]
+fn test_decode_2_events_from_path() {
+    pyo3::prepare_freethreaded_python();
+    let take = 2;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = decode_n_events_from_file(p, take, None, None);
+    let packets = res.unwrap();
+    println!("Got: {packets} packets", packets = packets.len());
+    assert_eq!(packets.len(), take);
+}
+
+#[test]
+fn test_decode_split_events_from_path() {
+    pyo3::prepare_freethreaded_python();
+    let take_first = 2;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = decode_n_events_from_file(p.clone(), take_first, None, None);
+    let mut running_packets = res.unwrap();
+    println!("Got: {packets} packets", packets = running_packets.len());
+    assert_eq!(running_packets.len(), take_first);
+
+    let take_second = 2;
+    let res = decode_n_events_from_file(p.clone(), take_second, Some(running_packets.len()), None);
+    running_packets.extend(res.unwrap());
+    println!("Got: {packets} packets", packets = running_packets.len());
+    assert_eq!(running_packets.len(), take_first + take_second);
+
+    let take_third = 2;
+    let res = decode_n_events_from_file(p, take_third, Some(running_packets.len()), None);
+    println!("Got : {:?}", res);
+    assert!(res.is_err());
+}
