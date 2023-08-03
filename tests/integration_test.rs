@@ -547,3 +547,33 @@ fn test_skip_n_take_all_from_file() {
     let (packets, _) = skip_n_take_all_from_file(p.clone(), 4).unwrap();
     assert!(packets.is_none());
 }
+
+#[test]
+fn test_decode_split_events_from_file_spillover() {
+    pyo3::prepare_freethreaded_python();
+    let mut running_packets = Vec::new();
+    let take = 2;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    loop {
+        let skip = if running_packets.is_empty() {
+            None
+        } else {
+            Some(running_packets.len())
+        };
+        let res = decode_n_events_from_file(p.clone(), take, skip, None);
+        if res.is_err() {
+            println!("Got error: {:?}", res);
+            break;
+        }
+        running_packets.extend(res.unwrap());
+    }
+    let skip = running_packets.len();
+    let (packets, remainder) = skip_n_take_all_from_file(p.clone(), skip).unwrap();
+    assert!(
+        packets.is_none(),
+        "take is two ({take}) but there's still packets in the file"
+    );
+    let p2 = std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START);
+    let res = decode_n_events_from_file(p2.clone(), take, None, remainder);
+    assert_eq!(res.unwrap().len(), 2);
+}
