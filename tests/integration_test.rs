@@ -488,7 +488,7 @@ fn test_decode_2_events_from_path() {
 }
 
 #[test]
-fn test_decode_split_events_from_path() {
+fn test_decode_split_events_from_path_repeated_until_err() {
     pyo3::prepare_freethreaded_python();
     let take_first = 2;
     let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
@@ -507,4 +507,19 @@ fn test_decode_split_events_from_path() {
     let res = decode_n_events_from_file(p, take_third, Some(running_packets.len()), None);
     println!("Got : {:?}", res);
     assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("No MOSS Packets in events"));
+}
+
+#[test]
+fn test_decode_split_events_from_path_take_too_many() {
+    pyo3::prepare_freethreaded_python();
+    let take_first = 10;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = decode_n_events_from_file(p.clone(), take_first, None, None);
+    println!("Got : {:?}", res);
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("BytesWarning"));
 }
