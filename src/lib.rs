@@ -472,58 +472,85 @@ mod rust_only {
         Ok(prealloc)
     }
 
-    /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
-    /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
-    #[inline]
-    fn extract_packet(bytes: &[u8]) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
-        if let Some(header_idx) = bytes
-            .iter()
-            .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
-        {
-            let mut bytes_iter = bytes.iter().skip(header_idx + 1);
-            match extract_hits(&mut bytes_iter) {
-                Ok(hits) => Ok((
-                    MossPacket {
-                        unit_id: bytes[header_idx] & 0xF,
-                        hits,
-                    },
-                    bytes.len() - bytes_iter.len() - 1,
-                )),
-                Err(e) => Err(ParseError::new(
-                    e.kind(),
-                    &format_error_msg(e.message(), e.err_index() + 1, &bytes[header_idx..]),
-                    header_idx + e.err_index() + 1,
-                )),
-            }
-        } else {
-            Err(ParseError::new(
-                ParseErrorKind::NoHeaderFound,
-                "No Unit Frame Header found",
-                0,
-            ))
-        }
-    }
-
-    #[inline]
     /// If a prepend buffer is given, it is prepended to `bytes` and the packet is extracted from the combined buffer.
     /// If no prepend buffer is given, the packet is extracted from `bytes`.
+    #[inline]
     pub(crate) fn extract_packet_from_buf(
         bytes: &[u8],
         prepend_bytes: Option<Vec<u8>>,
     ) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
         // Collect bytes from `bytes` until a header is seen
-
         if let Some(mut prepend) = prepend_bytes {
+            let prepend_count = prepend.len();
             prepend.extend(
                 bytes
                     .iter()
                     .take_while(|b| **b != MossWord::UNIT_FRAME_TRAILER),
             );
             prepend.push(MossWord::UNIT_FRAME_TRAILER); // Add the trailer back since `take_while` is EXCLUSIVE
-            extract_packet(&prepend)
+            extract_packet(&prepend, prepend_count)
         } else {
-            extract_packet(bytes)
+            extract_packet(bytes, 0)
         }
+    }
+
+    /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
+    /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
+    #[inline]
+    fn extract_packet(
+        bytes: &[u8],
+        prepend_byte_cnt: usize,
+    ) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
+        // Check that everything before the first header is delimiter bytes
+        //
+        // Takes bytes while they are equal to the delimiter byte
+        // and checks that the first byte that is not equal to the delimiter byte is a valid header byte.
+        let header_idx = find_header_index(bytes)?;
+
+        let mut bytes_iter = bytes.iter().skip(header_idx + 1);
+        match extract_hits(&mut bytes_iter) {
+            Ok(hits) => Ok((
+                MossPacket {
+                    unit_id: bytes[header_idx] & 0xF,
+                    hits,
+                },
+                bytes.len() - bytes_iter.len() - 1 - prepend_byte_cnt,
+            )),
+            Err(e) => Err(ParseError::new(
+                e.kind(),
+                &format_error_msg(e.message(), e.err_index() + 1, &bytes[header_idx..]),
+                header_idx + e.err_index() + 1,
+            )),
+        }
+    }
+
+    // Check that everything before the first header is delimiter bytes
+    //
+    // Takes bytes while they are equal to the delimiter byte
+    // and checks that the first byte that is not equal to the delimiter byte is a valid header byte.
+    // Allows the first byte to be the trailer byte, e.g. from a previous event.
+    #[inline]
+    fn find_header_index(bytes: &[u8]) -> Result<usize, ParseError> {
+        for (i, &b) in bytes.iter().enumerate() {
+            // Allow the first byte to be the trailer byte, e.g. from a previous event.
+            if b == MossWord::DELIMITER || (i == 0 && b == MossWord::UNIT_FRAME_TRAILER) {
+                continue;
+            } else if MossWord::UNIT_FRAME_HEADER_RANGE.contains(&b) {
+                return Ok(i);
+            } else {
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidDelimiter,
+                    &format_error_msg("Invalid delimiter", i, bytes),
+                    i,
+                ));
+            }
+        }
+        let byte_count = bytes.len();
+        Err(ParseError::new(
+            ParseErrorKind::NoHeaderFound,
+            "No Unit Frame Header found",
+            byte_count,
+        ))
     }
 
     /// Formats an error message with an error description and the byte that triggered the error.

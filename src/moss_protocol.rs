@@ -29,7 +29,7 @@ impl MossWord {
     pub(super) const DATA_0: u8 = 0b0000_0000; // 00_<hit_row_pos[8:3]>
     pub(super) const DATA_1: u8 = 0b0100_0000; // 01_<hit_row_pos[2:0]>_<hit_col_pos[8:6]>
     pub(super) const DATA_2: u8 = 0b1000_0000; // 10_<hit_col_pos[5:0]>
-    pub(super) const DELIMITER: u8 = 0xFA; // subject to change (FPGA implementation detail)
+    pub(super) const DELIMITER: u8 = 0xFA; // Not actually part of the MOSS protocol and could be subject to change (FPGA implementation detail)
     pub(crate) const UNIT_FRAME_HEADER_RANGE: RangeInclusive<u8> = 0xD1..=0xDA;
     pub(crate) const DATA_0_RANGE: RangeInclusive<u8> = 0..=0b0010_1000; // Max is 320 pixel on bottom regions
     pub(crate) const DATA_1_RANGE: RangeInclusive<u8> = 0b0100_0000..=0b0111_1101; // Max is 320 pixel on bottom regions
