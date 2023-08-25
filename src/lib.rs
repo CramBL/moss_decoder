@@ -102,7 +102,12 @@ pub fn decode_all_events(bytes: &[u8]) -> PyResult<Tuple_List_MossPackets_LastTr
                     packet_cnt = moss_packets.len() + 1
                 )));
             }
-            Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
+            Err(e) => {
+                return Err(PyAssertionError::new_err(format!(
+                    "Decoding packet #{packet_cnt} failed with: {e}",
+                    packet_cnt = moss_packets.len() + 1
+                )))
+            }
         }
     }
 
@@ -138,33 +143,29 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
             break;
         }
 
-        let mut last_trailer_idx = 0;
-
         // Extend bytes_to_decode with the new data
         bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
 
         // Decode the bytes one event at a time until there's no more events to decode
-        loop {
-            match rust_only::extract_packet_from_buf(&bytes_to_decode[last_trailer_idx..], None) {
-                Ok((moss_packet, trailer_idx)) => {
-                    moss_packets.push(moss_packet);
-                    last_trailer_idx += trailer_idx + 1;
-                }
-                Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
-                    break;
-                }
-                Err(e) if e.kind() == ParseErrorKind::NoHeaderFound => {
-                    if moss_packets.is_empty() {
-                        return Err(PyAssertionError::new_err(format!("Decoding failed: {e}")));
-                    } else {
-                        break;
-                    }
-                }
-                Err(e) => return Err(PyAssertionError::new_err(format!("Decoding failed: {e}",))),
+        match rust_only::get_all_packets_from_buf(&bytes_to_decode) {
+            Ok((extracted_packets, last_trailer_idx)) => {
+                moss_packets.extend(extracted_packets);
+                // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
+                bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
+            }
+            Err((e, failed_packet_num)) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                return Err(PyBytesWarning::new_err(format!(
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + failed_packet_num
+                )));
+            }
+            Err((e, failed_packet_num)) => {
+                return Err(PyAssertionError::new_err(format!(
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + failed_packet_num
+                )))
             }
         }
-        // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
-        bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
     }
 
     if moss_packets.is_empty() {
@@ -268,11 +269,190 @@ pub fn skip_n_take_all(
             }
             Err(e) => {
                 return Err(PyAssertionError::new_err(format!(
-                    "Decoding packet {packet_cnt} failed with: {e}",
+                    "Decoding packet #{packet_cnt} failed with: {e}",
                     packet_cnt = moss_packets.len() + 1
                 )))
             }
         }
+    }
+
+    if moss_packets.is_empty() {
+        Ok((None, remainder))
+    } else {
+        Ok((Some(moss_packets), remainder))
+    }
+}
+
+/// Decodes N events from the given file.
+/// Optionally allows for either (not both):
+/// - skipping `skip` events before decoding.
+/// - prepending `prepend_buffer` to the bytes before decoding.
+///
+/// Arguments: path: `str`, take: `int`, skip: `Optional[int]`, prepend_buffer: `Optional[bytes]`
+/// Returns: `List[MossPacket]`
+#[pyfunction]
+pub fn decode_n_events_from_file(
+    path: std::path::PathBuf,
+    take: usize,
+    skip: Option<usize>,
+    mut prepend_buffer: Option<Vec<u8>>,
+) -> PyResult<List_MossPackets> {
+    // Skip N events
+    if skip.is_some_and(|s| s == 0) {
+        return Err(PyValueError::new_err("skip value must be greater than 0"));
+    } else if skip.is_some() && prepend_buffer.is_some() {
+        return Err(PyValueError::new_err(
+            "skip and prepend_buffer cannot be used together",
+        ));
+    }
+    // Open file (get file descriptor)
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(PyFileNotFoundError::new_err(e.to_string())),
+    };
+
+    // Create buffered reader with 1MB capacity to minimize syscalls to read
+    let mut reader = std::io::BufReader::with_capacity(READER_BUFFER_CAPACITY, file);
+
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(take);
+
+    let mut buf = vec![0; READER_BUFFER_CAPACITY];
+    let mut bytes_to_decode = Vec::with_capacity(READER_BUFFER_CAPACITY);
+    if let Some(prepend_buffer) = prepend_buffer.take() {
+        bytes_to_decode.extend_from_slice(&prepend_buffer);
+    }
+    let mut packets_to_skip = skip.unwrap_or(0);
+
+    while let Ok(bytes_read) = reader.read(&mut buf) {
+        if bytes_read == 0 {
+            break;
+        }
+
+        // Extend bytes_to_decode with the new data
+        bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
+
+        // Decode the bytes one event at a time until there's no more events to decode
+        match rust_only::get_all_packets_from_buf(&bytes_to_decode) {
+            Ok((mut extracted_packets, last_trailer_idx)) => {
+                if packets_to_skip > 0 {
+                    if packets_to_skip > extracted_packets.len() {
+                        packets_to_skip -= extracted_packets.len();
+                        bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
+                        continue;
+                    } else {
+                        for _ in 0..packets_to_skip {
+                            _ = extracted_packets.remove(0);
+                        }
+                        packets_to_skip = 0;
+                    }
+                }
+                moss_packets.extend(extracted_packets);
+                if moss_packets.len() >= take {
+                    break;
+                }
+                // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
+                bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
+            }
+            Err((e, failed_packet_num)) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                return Err(PyBytesWarning::new_err(format!(
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + failed_packet_num
+                )));
+            }
+            Err((e, failed_packet_num)) => {
+                return Err(PyAssertionError::new_err(format!(
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + failed_packet_num
+                )))
+            }
+        }
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else if moss_packets.len() < take {
+        Err(PyBytesWarning::new_err(format!(
+            "Taking {take} events failed, got {decoded_cnt} events",
+            decoded_cnt = moss_packets.len()
+        )))
+    } else {
+        moss_packets.truncate(take); // Truncate to the requested number of events
+        Ok(moss_packets)
+    }
+}
+
+/// Decodes all events from the given file, skipping the first `skip` events
+///  and returns the remainder bytes if a partial event was found in it.
+///
+/// Arguments: path: `str`, skip: `Optional[int]`
+/// Returns: `Tuple[Optional[List[MossPacket]], Optional[bytes]]`
+#[pyfunction]
+pub fn skip_n_take_all_from_file(
+    path: std::path::PathBuf,
+    mut skip: usize,
+) -> PyResult<(Option<List_MossPackets>, Option<Remainder_Bytes>)> {
+    let mut moss_packets: Vec<MossPacket> = Vec::new();
+    let mut remainder: Option<Vec<u8>> = None;
+    // Open file (get file descriptor)
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(PyFileNotFoundError::new_err(e.to_string())),
+    };
+
+    // Create buffered reader with 1MB capacity to minimize syscalls to read
+    let mut reader = std::io::BufReader::with_capacity(READER_BUFFER_CAPACITY, file);
+
+    let mut buf = vec![0; READER_BUFFER_CAPACITY];
+    let mut bytes_to_decode = Vec::with_capacity(READER_BUFFER_CAPACITY);
+
+    while let Ok(bytes_read) = reader.read(&mut buf) {
+        if bytes_read == 0 {
+            break;
+        }
+
+        // Extend bytes_to_decode with the new data
+        bytes_to_decode.extend_from_slice(&buf[..bytes_read]);
+
+        // Decode the bytes one event at a time until there's no more events to decode
+        match rust_only::get_all_packets_from_buf(&bytes_to_decode) {
+            Ok((mut extracted_packets, last_trailer_idx)) => {
+                if skip > 0 {
+                    if skip > extracted_packets.len() {
+                        skip -= extracted_packets.len();
+                        bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
+                        continue;
+                    } else {
+                        for _ in 0..skip {
+                            _ = extracted_packets.remove(0);
+                        }
+                        skip = 0;
+                    }
+                }
+                moss_packets.extend(extracted_packets);
+                // Remove the processed bytes from bytes_to_decode (it now contains the remaining bytes that could did not form a complete event)
+                bytes_to_decode = bytes_to_decode[last_trailer_idx..].to_vec();
+            }
+            Err((e, _)) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                break;
+            }
+            Err((e, _)) if e.kind() == ParseErrorKind::NoHeaderFound => {
+                break;
+            }
+            Err((e, failed_packet_num)) => {
+                return Err(PyAssertionError::new_err(format!(
+                    "Failed decoding packet #{packet_cnt}: {e}",
+                    packet_cnt = moss_packets.len() + failed_packet_num
+                )))
+            }
+        }
+    }
+
+    if !bytes_to_decode.is_empty()
+        && bytes_to_decode
+            .iter()
+            .any(|&b| moss_protocol::MossWord::UNIT_FRAME_HEADER_RANGE.contains(&b))
+    {
+        remainder = Some(bytes_to_decode.to_vec());
     }
 
     if moss_packets.is_empty() {
@@ -312,58 +492,85 @@ mod rust_only {
         Ok(prealloc)
     }
 
-    /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
-    /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
-    #[inline]
-    fn extract_packet(bytes: &[u8]) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
-        if let Some(header_idx) = bytes
-            .iter()
-            .position(|b| MossWord::UNIT_FRAME_HEADER_RANGE.contains(b))
-        {
-            let mut bytes_iter = bytes.iter().skip(header_idx + 1);
-            match extract_hits(&mut bytes_iter) {
-                Ok(hits) => Ok((
-                    MossPacket {
-                        unit_id: bytes[header_idx] & 0xF,
-                        hits,
-                    },
-                    bytes.len() - bytes_iter.len() - 1,
-                )),
-                Err(e) => Err(ParseError::new(
-                    e.kind(),
-                    &format_error_msg(e.message(), e.err_index() + 1, &bytes[header_idx..]),
-                    header_idx + e.err_index() + 1,
-                )),
-            }
-        } else {
-            Err(ParseError::new(
-                ParseErrorKind::NoHeaderFound,
-                "No Unit Frame Header found",
-                0,
-            ))
-        }
-    }
-
-    #[inline]
     /// If a prepend buffer is given, it is prepended to `bytes` and the packet is extracted from the combined buffer.
     /// If no prepend buffer is given, the packet is extracted from `bytes`.
+    #[inline]
     pub(crate) fn extract_packet_from_buf(
         bytes: &[u8],
         prepend_bytes: Option<Vec<u8>>,
     ) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
         // Collect bytes from `bytes` until a header is seen
-
         if let Some(mut prepend) = prepend_bytes {
+            let prepend_count = prepend.len();
             prepend.extend(
                 bytes
                     .iter()
                     .take_while(|b| **b != MossWord::UNIT_FRAME_TRAILER),
             );
             prepend.push(MossWord::UNIT_FRAME_TRAILER); // Add the trailer back since `take_while` is EXCLUSIVE
-            extract_packet(&prepend)
+            extract_packet(&prepend, prepend_count)
         } else {
-            extract_packet(bytes)
+            extract_packet(bytes, 0)
         }
+    }
+
+    /// Advances the iterator until a Unit Frame Header is encountered, saves the unit ID,
+    /// and extracts the hits with the [extract_hits] function, before returning a MossPacket if one is found.
+    #[inline]
+    fn extract_packet(
+        bytes: &[u8],
+        prepend_byte_cnt: usize,
+    ) -> Result<Tuple_MossPacket_LastTrailerIdx, ParseError> {
+        // Check that everything before the first header is delimiter bytes
+        //
+        // Takes bytes while they are equal to the delimiter byte
+        // and checks that the first byte that is not equal to the delimiter byte is a valid header byte.
+        let header_idx = find_header_index(bytes)?;
+
+        let mut bytes_iter = bytes.iter().skip(header_idx + 1);
+        match extract_hits(&mut bytes_iter) {
+            Ok(hits) => Ok((
+                MossPacket {
+                    unit_id: bytes[header_idx] & 0xF,
+                    hits,
+                },
+                bytes.len() - bytes_iter.len() - 1 - prepend_byte_cnt,
+            )),
+            Err(e) => Err(ParseError::new(
+                e.kind(),
+                &format_error_msg(e.message(), e.err_index() + 1, &bytes[header_idx..]),
+                header_idx + e.err_index() + 1,
+            )),
+        }
+    }
+
+    // Check that everything before the first header is delimiter bytes
+    //
+    // Takes bytes while they are equal to the delimiter byte
+    // and checks that the first byte that is not equal to the delimiter byte is a valid header byte.
+    // Allows the first byte to be the trailer byte, e.g. from a previous event.
+    #[inline]
+    fn find_header_index(bytes: &[u8]) -> Result<usize, ParseError> {
+        for (i, &b) in bytes.iter().enumerate() {
+            // Allow the first byte to be the trailer byte, e.g. from a previous event.
+            if b == MossWord::DELIMITER || (i == 0 && b == MossWord::UNIT_FRAME_TRAILER) {
+                continue;
+            } else if MossWord::UNIT_FRAME_HEADER_RANGE.contains(&b) {
+                return Ok(i);
+            } else {
+                return Err(ParseError::new(
+                    ParseErrorKind::InvalidDelimiter,
+                    &format_error_msg("Invalid delimiter", i, bytes),
+                    i,
+                ));
+            }
+        }
+        let byte_count = bytes.len();
+        Err(ParseError::new(
+            ParseErrorKind::NoHeaderFound,
+            "No Unit Frame Header found",
+            byte_count,
+        ))
     }
 
     /// Formats an error message with an error description and the byte that triggered the error.
@@ -386,5 +593,50 @@ mod rust_only {
             .map(|b| format!("{b:02X}"))
             .collect::<Vec<_>>()
             .join(" "))
+    }
+
+    // On error, returns the error and the number of the packet that failed to decode
+    // i.e. if 8 packets are decoded successfully and the 9th packet fails, the error will be returned with 9.
+    pub(crate) fn get_all_packets_from_buf(
+        buf: &[u8],
+    ) -> Result<(Vec<MossPacket>, usize), (ParseError, usize)> {
+        let prealloc = if buf.len() / 1024 > MIN_PREALLOC {
+            buf.len() / 1024
+        } else {
+            MIN_PREALLOC
+        };
+        let mut moss_packets = Vec::with_capacity(prealloc);
+        let mut last_trailer_idx = 0;
+        loop {
+            match extract_packet_from_buf(&buf[last_trailer_idx..], None) {
+                Ok((moss_packet, trailer_idx)) => {
+                    moss_packets.push(moss_packet);
+                    last_trailer_idx += trailer_idx + 1;
+                }
+                Err(e) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
+                    if moss_packets.is_empty() {
+                        return Err((e, 0));
+                    } else {
+                        break;
+                    }
+                }
+                Err(e) if e.kind() == ParseErrorKind::NoHeaderFound => {
+                    if moss_packets.is_empty() {
+                        return Err((e, 0));
+                    } else {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    if moss_packets.is_empty() {
+                        return Err((e, 0));
+                    } else {
+                        // Return the number of the packet that failed to decode
+                        Err((e, moss_packets.len() + 1))?
+                    }
+                }
+            }
+        }
+        Ok((moss_packets, last_trailer_idx))
     }
 }

@@ -19,6 +19,8 @@ Python package implemented in Rust for high-performance decoding of readout data
   - [MOSS event data packet protocol FSM](#moss-event-data-packet-protocol-fsm)
   - [MOSS event data packet decoder FSM](#moss-event-data-packet-decoder-fsm)
   - [Event packet hit decoder FSM](#event-packet-hit-decoder-fsm)
+  - [Running tests](#running-tests)
+    - [Testing local changes](#testing-local-changes)
   - [Motivation \& Purpose](#motivation--purpose)
   - [@CERN Gitlab installation for CentOS and similar distributions from local build](#cern-gitlab-installation-for-centos-and-similar-distributions-from-local-build)
     - [Troubleshooting](#troubleshooting)
@@ -223,6 +225,15 @@ stateDiagram-v2
 ```
 
 Decoding hits using the FSM above leads to higher performance and assures correct decoding by validating the state transitions.
+
+## Running tests
+Rust unit and integration tests can be executed with `cargo test --no-default-features`.
+
+The `--no-default-features` flag has to be supplied to be able to run tests that links to Python types e.g. throwing Python exceptions, this is a temporary workaround [see more](https://pyo3.rs/main/changelog.html?highlight=--no-default-features#regressions).
+
+Python integration tests can be run by running `ìntegration.py` with Python.
+### Testing local changes
+Testing against local changes in the Rust code requires first compiling and installing the _wheel package_, the tool [maturin](https://github.com/PyO3/maturin) is used for this, you can look at the shell script [performance_dev_py.sh](tests/performance_dev_py.sh) for inspiration. If you have access to bash you can simply run the [shell script performance_dev_py.sh](performance_dev_py.sh) which will compile and install it for you, but it will also run a little benchmark with [hyperfine](https://github.com/sharkdp/hyperfine), if you are not interested in the benchmark, just don't run the hyperfine command in the end of the `measure_performance_dev` function.
 
 ## Motivation & Purpose
 Decoding in native Python is slow and the MOSS verification team at CERN got to a point where we needed more performance.

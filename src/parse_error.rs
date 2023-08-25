@@ -3,6 +3,7 @@ pub(crate) enum ParseErrorKind {
     NoHeaderFound,
     EndOfBufferNoTrailer,
     ProtocolError,
+    InvalidDelimiter,
 }
 
 impl std::fmt::Display for ParseErrorKind {

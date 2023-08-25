@@ -475,3 +475,105 @@ fn test_decode_split_events_from_both_files() {
     println!("Last trailer at index: {last_trailer_idx}");
     assert_eq!(packets.len() + packets2.len(), take);
 }
+
+#[test]
+fn test_decode_2_events_from_path() {
+    pyo3::prepare_freethreaded_python();
+    let take = 2;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = decode_n_events_from_file(p, take, None, None);
+    let packets = res.unwrap();
+    println!("Got: {packets} packets", packets = packets.len());
+    assert_eq!(packets.len(), take);
+}
+
+#[test]
+fn test_decode_split_events_from_path_repeated_until_err() {
+    pyo3::prepare_freethreaded_python();
+    let take_first = 2;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = decode_n_events_from_file(p.clone(), take_first, None, None);
+    let mut running_packets = res.unwrap();
+    println!("Got: {packets} packets", packets = running_packets.len());
+    assert_eq!(running_packets.len(), take_first);
+
+    let take_second = 2;
+    let res = decode_n_events_from_file(p.clone(), take_second, Some(running_packets.len()), None);
+    running_packets.extend(res.unwrap());
+    println!("Got: {packets} packets", packets = running_packets.len());
+    assert_eq!(running_packets.len(), take_first + take_second);
+
+    let take_third = 2;
+    let res = decode_n_events_from_file(p, take_third, Some(running_packets.len()), None);
+    println!("Got : {:?}", res);
+    assert!(res.is_err());
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("No MOSS Packets in events"));
+}
+
+#[test]
+fn test_decode_split_events_from_path_take_too_many() {
+    pyo3::prepare_freethreaded_python();
+    let take_first = 10;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = decode_n_events_from_file(p.clone(), take_first, None, None);
+    println!("Got : {:?}", res);
+    assert!(res.is_err());
+    assert!(res.unwrap_err().to_string().contains("BytesWarning"));
+}
+
+#[test]
+fn test_skip_n_take_all_from_file() {
+    pyo3::prepare_freethreaded_python();
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    let res = skip_n_take_all_from_file(p.clone(), 0);
+    assert!(res.is_ok());
+    let (packets, remainder) = res.unwrap();
+    assert!(packets.is_some());
+    assert!(remainder.is_some());
+    assert_eq!(packets.unwrap().len(), 4);
+    let remainder = remainder.unwrap();
+    println!("Got {} remainder bytes", remainder.len());
+    println!("Got remainder: {:02X?}", remainder);
+
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 1).unwrap();
+    assert_eq!(packets.unwrap().len(), 3);
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 2).unwrap();
+    assert_eq!(packets.unwrap().len(), 2);
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 3).unwrap();
+    assert_eq!(packets.unwrap().len(), 1);
+    let (packets, _) = skip_n_take_all_from_file(p.clone(), 4).unwrap();
+    assert!(packets.is_none());
+}
+
+#[test]
+fn test_decode_split_events_from_file_spillover() {
+    pyo3::prepare_freethreaded_python();
+    let mut running_packets = Vec::new();
+    let take = 2;
+    let p = std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END);
+    loop {
+        let skip = if running_packets.is_empty() {
+            None
+        } else {
+            Some(running_packets.len())
+        };
+        let res = decode_n_events_from_file(p.clone(), take, skip, None);
+        if res.is_err() {
+            println!("Got error: {:?}", res);
+            break;
+        }
+        running_packets.extend(res.unwrap());
+    }
+    let skip = running_packets.len();
+    let (packets, remainder) = skip_n_take_all_from_file(p.clone(), skip).unwrap();
+    assert!(
+        packets.is_none(),
+        "take is two ({take}) but there's still packets in the file"
+    );
+    let p2 = std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START);
+    let res = decode_n_events_from_file(p2.clone(), take, None, remainder);
+    assert_eq!(res.unwrap().len(), 2);
+}
