@@ -6,7 +6,7 @@
 # shellcheck disable=SC1091
 source ./tests/utils.sh
 
-function measure_performance_prod {
+function measure_performance_dev {
     python -V
 
     # Make virtual environment
@@ -45,5 +45,5 @@ function measure_performance_prod {
 
 # Only run the performance test if this script is invoked with no arguments (to allow importing the function without running it)
 if [[ $# -eq 0 ]] ; then
-    measure_performance_prod
+    measure_performance_dev
 fi

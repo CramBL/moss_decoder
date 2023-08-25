@@ -6,7 +6,7 @@
 # shellcheck disable=SC1091
 source ./tests/utils.sh
 
-function measure_performance_dev {
+function measure_performance_prod {
     python -V
 
     # Make virtual environment
@@ -35,5 +35,5 @@ function measure_performance_dev {
 }
 
 if [[ $# -eq 0 ]] ; then
-    measure_performance_dev
+    measure_performance_prod
 fi
