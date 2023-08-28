@@ -9,6 +9,12 @@ pub const REGION_HEADER_1: u8 = 0xC1;
 pub const REGION_HEADER_2: u8 = 0xC2;
 pub const REGION_HEADER_3: u8 = 0xC3;
 
+/// Simple MOSS event
+///
+/// Characteristics:
+/// - Unit ID: 1
+/// - Hit count: 4
+/// - Trailer index: 18
 pub fn fake_event_simple() -> Vec<u8> {
     vec![
         UNIT_FRAME_HEADER_1,
