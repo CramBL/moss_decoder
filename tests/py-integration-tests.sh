@@ -19,8 +19,7 @@ function py_integration_tests {
     println_cyan "Show installed packages"
     python -m pip freeze
 
-    println_cyan "install hyperfine and maturin"
-    cargo install hyperfine --locked
+    println_cyan "install maturin"
     python -m pip install maturin
 
     println_cyan "Build and install the local package"
