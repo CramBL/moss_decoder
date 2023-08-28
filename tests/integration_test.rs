@@ -10,6 +10,7 @@ const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.r
 const NOISE_ALL_REGION_PACKETS: usize = 1000;
 const NOISE_ALL_REGION_HITS: usize = 6085;
 const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
+
 const FILE_NOISE_RANDOM_REGION: &str = "tests/test-data/noise_random_region.raw";
 const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw";
 
@@ -29,6 +30,50 @@ fn compare_all_packets(a_packets: &[MossPacket], b_packets: &[MossPacket]) {
             assert_eq!(a_hit.column, b_hit.column);
         }
     }
+}
+
+// Compare the result of all decoding methods that can decode all packets from a file/byte array
+fn compare_all_decoding_methods(
+    test_file: &str,
+    expect_packets: usize,
+    expect_hits: usize,
+    expect_trailer_idx: usize,
+) {
+    let bytes = std::fs::read(std::path::PathBuf::from(test_file)).unwrap();
+
+    // Do an initial comparison with the simple naive decoder and the expected values
+    let (debug_packets, debug_last_trailer_idx, _invalid_words) =
+        moss_decoder::debug_decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, expect_trailer_idx);
+    assert_eq!(debug_packets.len(), expect_packets);
+    assert_eq!(
+        debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
+        expect_hits
+    );
+
+    // Then use that result to compare with the other decoding methods
+
+    // Check moss_decoder::decode_all_events
+    let (decode_all_events_packets, decode_all_events_last_trailer_idx) =
+        moss_decoder::decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, decode_all_events_last_trailer_idx);
+    compare_all_packets(&debug_packets, &decode_all_events_packets);
+
+    // Check moss_decoder::decode_from_file
+    let packets = moss_decoder::decode_from_file(test_file.into()).unwrap();
+    compare_all_packets(&packets, &decode_all_events_packets);
+
+    // Check moss_decoder::skip_n_take_all
+    let (packets, remainder) = moss_decoder::skip_n_take_all(&bytes, 0).unwrap();
+    let packets = packets.unwrap();
+    assert!(remainder.is_none());
+    compare_all_packets(&packets, &decode_all_events_packets);
+
+    // Check moss_decoder::decode_n_events
+    let (packets, last_trailer_idx) =
+        moss_decoder::decode_n_events(&bytes, expect_packets, None, None).unwrap();
+    assert_eq!(last_trailer_idx, debug_last_trailer_idx);
+    compare_all_packets(&packets, &decode_all_events_packets);
 }
 
 #[test]
@@ -639,39 +684,10 @@ fn test_debug_decode_noise_all_region() {
 #[test]
 fn test_compare_result_noise_all_region() {
     pyo3::prepare_freethreaded_python();
-
-    let bytes = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE_ALL_REGION)).unwrap();
-
-    // Compare debug_decode_all_events and decode_all_events
-    let (debug_packets, debug_last_trailer_idx, _invalid_words) =
-        moss_decoder::debug_decode_all_events(&bytes).unwrap();
-    let (decode_all_events_packets, decode_all_events_last_trailer_idx) =
-        moss_decoder::decode_all_events(&bytes).unwrap();
-
-    assert_eq!(debug_last_trailer_idx, decode_all_events_last_trailer_idx);
-    assert_eq!(debug_packets.len(), NOISE_ALL_REGION_PACKETS);
-    assert_eq!(
+    compare_all_decoding_methods(
+        FILE_MOSS_NOISE_ALL_REGION,
+        NOISE_ALL_REGION_PACKETS,
         NOISE_ALL_REGION_HITS,
-        decode_all_events_packets
-            .iter()
-            .fold(0, |acc, p| acc + p.hits.len())
+        26542,
     );
-
-    compare_all_packets(&debug_packets, &decode_all_events_packets);
-
-    // Compare decode_from_file and decode_all_events
-    let packets = moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.into()).unwrap();
-    compare_all_packets(&packets, &decode_all_events_packets);
-
-    let (packets, remainder) = moss_decoder::skip_n_take_all(&bytes, 0).unwrap();
-    let packets = packets.unwrap();
-    assert!(remainder.is_none());
-
-    compare_all_packets(&packets, &decode_all_events_packets);
-
-    // Compare decode_n_events and decode_all_events
-    let (packets, last_trailer_idx) =
-        moss_decoder::decode_n_events(&bytes, 1000, None, None).unwrap();
-    assert_eq!(last_trailer_idx, debug_last_trailer_idx);
-    compare_all_packets(&packets, &decode_all_events_packets);
 }
