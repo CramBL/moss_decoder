@@ -30,6 +30,7 @@ use std::io::Read;
 
 pub mod moss_protocol;
 pub use moss_protocol::MossHit;
+mod debug_decode;
 pub mod decode_hits_fsm;
 pub(crate) mod parse_error;
 pub(crate) mod parse_util;
@@ -49,14 +50,17 @@ fn moss_decoder(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
+type LastTrailerIdx = usize;
+type InvalidWordMsgs = Vec<String>;
+
 #[allow(non_camel_case_types)]
 type List_MossPackets = Vec<MossPacket>;
 
 #[allow(non_camel_case_types)]
-type Tuple_MossPacket_LastTrailerIdx = (MossPacket, usize);
+type Tuple_MossPacket_LastTrailerIdx = (MossPacket, LastTrailerIdx);
 
 #[allow(non_camel_case_types)]
-type Tuple_List_MossPackets_LastTrailerIdx = (List_MossPackets, usize);
+type Tuple_List_MossPackets_LastTrailerIdx = (List_MossPackets, LastTrailerIdx);
 
 const READER_BUFFER_CAPACITY: usize = 10 * 1024 * 1024; // 10 MiB
 const MINIMUM_EVENT_SIZE: usize = 2;
@@ -115,6 +119,58 @@ pub fn decode_all_events(bytes: &[u8]) -> PyResult<Tuple_List_MossPackets_LastTr
         Err(PyAssertionError::new_err("No MOSS Packets in events"))
     } else {
         Ok((moss_packets, last_trailer_idx - 1))
+    }
+}
+
+#[pyfunction]
+/// Decodes as many MOSS events as possible into a list of [MossPacket]s.
+/// Doesn't check for invalid state transitions. Runs over errors when possible and instead returns a list of invalid words.
+///
+/// Useful for attempting to extract as many packets and debug based on packet analysis.
+pub fn debug_decode_all_events(
+    bytes: &[u8],
+) -> PyResult<(List_MossPackets, LastTrailerIdx, InvalidWordMsgs)> {
+    let approx_moss_packets = rust_only::calc_prealloc_val(bytes)?;
+    let mut moss_packets: Vec<MossPacket> = Vec::with_capacity(approx_moss_packets);
+
+    // To prevent creating so many error message strings that the user runs out of memory we limit the number of errors.
+    // If all errors are reported at indexes higher than 1 GiB then the error message size is 76 bytes or more.
+    // 14,128,181 error messages can fit in 1 GiB (not counting string size and any extra capacity).
+    // That's a very high numbers so let's round down to a more reasonable number and make it one that has a nice binary representation.
+    const MAX_REPORT_ERRORS: usize = 0xFFFFF; // 1,048,575 errors
+
+    let mut last_trailer_idx = 0;
+    let mut invalid_words = Vec::new();
+
+    while let Ok((new_moss_packet, trailer_idx, new_invalid_words)) =
+        debug_decode::debug_decode_event(&bytes[last_trailer_idx..])
+    {
+        new_invalid_words.into_iter().for_each(|mut invalid_word| {
+            invalid_word.set_index_offset(last_trailer_idx);
+            invalid_words.push(invalid_word);
+        });
+        last_trailer_idx += trailer_idx + 1;
+        moss_packets.push(new_moss_packet);
+
+        if invalid_words.len() > MAX_REPORT_ERRORS {
+            Err(PyAssertionError::new_err(format!(
+                "Too many errors to report: {num_errors}",
+                num_errors = invalid_words.len()
+            )))?;
+        }
+    }
+
+    if moss_packets.is_empty() {
+        Err(PyAssertionError::new_err("No MOSS Packets in events"))
+    } else {
+        Ok((
+            moss_packets,
+            last_trailer_idx - 1,
+            invalid_words
+                .into_iter()
+                .map(|invalid_word| invalid_word.to_error_msg())
+                .collect(),
+        ))
     }
 }
 
