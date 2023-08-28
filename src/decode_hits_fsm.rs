@@ -117,7 +117,7 @@ pub(crate) fn extract_hits<'a>(
                 _ => {
                     return Err(ParseError::new(
                         ParseErrorKind::ProtocolError,
-                        "Expected REGION_HEADER_{1-3}/UNIT_FRAME_TRAILER",
+                        "Expected REGION_HEADER_{0-3}/UNIT_FRAME_TRAILER",
                         i,
                     ))
                 }
@@ -136,7 +136,6 @@ pub(crate) fn extract_hits<'a>(
                     st.transition(_RegionHeader3).as_enum()
                 }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
-                    current_region = 0;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
@@ -208,7 +207,7 @@ pub(crate) fn extract_hits<'a>(
             },
             IDLE_By_Idle(st) => match *b {
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
-                    add_data0(&mut hits, b, 0);
+                    add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
                 REGION_HEADER1 => {
@@ -246,7 +245,6 @@ pub(crate) fn extract_hits<'a>(
                     st.transition(_RegionHeader3).as_enum()
                 }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
-                    current_region = 1;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
@@ -268,7 +266,6 @@ pub(crate) fn extract_hits<'a>(
                     st.transition(_RegionHeader3).as_enum()
                 }
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
-                    current_region = 2;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
@@ -286,7 +283,6 @@ pub(crate) fn extract_hits<'a>(
             },
             REGION_HEADER3_By_RegionHeader3(st) => match *b {
                 b if MossWord::DATA_0_RANGE.contains(&b) => {
-                    current_region = 3;
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
