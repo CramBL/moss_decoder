@@ -32,7 +32,7 @@ pub fn fake_event_simple() -> Vec<u8> {
         0x00,
         0x50,
         0x88,
-        UNIT_FRAME_TRAILER,
+        UNIT_FRAME_TRAILER, // Index 18
     ]
 }
 
@@ -128,5 +128,52 @@ pub fn fake_event_protocol_error() -> Vec<u8> {
         0x50,
         0x88,
         UNIT_FRAME_TRAILER,
+    ]
+}
+
+/// This event has a 0xFB protocol error in the middle of the event.
+///
+/// Characteristics:
+/// - Unit ID: 1
+/// - Hit count: 8
+/// - Trailer index: 34
+/// - Invalid word index: 13
+pub fn fake_event_protocol_error_fb_in_idle() -> Vec<u8> {
+    vec![
+        UNIT_FRAME_HEADER_1,
+        REGION_HEADER_0,
+        0x00,
+        0b0100_0000, // row 0
+        0b1000_0000, // col 0
+        IDLE,
+        0x00,
+        0b0100_0000, // row 0
+        0b1000_0001, // col 1
+        IDLE,
+        0x00,
+        0b0100_0000, // row 0
+        0b1000_0010, // col 2
+        0xFB,        // Protocol error = 0xFB in IDLE position
+        0x00,
+        0b0100_1000, // row 1
+        0b1000_0001, // col 1
+        IDLE,
+        0x00,
+        0b0100_1000, // row 1
+        0b1000_0010, // col 2
+        IDLE,
+        REGION_HEADER_1,
+        0x00,
+        0b0100_1000, // row 1
+        0b1000_0001, // col 1
+        REGION_HEADER_2,
+        0x00,
+        0b0101_0000, // row 2
+        0b1000_0010, // col 2
+        REGION_HEADER_3,
+        0x00,
+        0b0101_1000,        // row 3
+        0b1000_0011,        // col 3
+        UNIT_FRAME_TRAILER, // index 34
     ]
 }
