@@ -13,9 +13,26 @@ const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw"
 const FILE_NOISE_RANDOM_REGION: &str = "tests/test-data/noise_random_region.raw";
 const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw";
 
+// Utility to compare all packets in two vectors (for comparing result of different decoding methods)
+fn compare_all_packets(a_packets: &[MossPacket], b_packets: &[MossPacket]) {
+    assert_eq!(a_packets.len(), b_packets.len());
+
+    for (i, a_packet) in a_packets.iter().enumerate() {
+        let b_packet = &b_packets[i];
+        assert_eq!(a_packet.unit_id, b_packet.unit_id);
+        assert_eq!(a_packet.hits.len(), b_packet.hits.len());
+        for (j, a_hit) in a_packet.hits.iter().enumerate() {
+            let b_hit = &b_packet.hits[j];
+
+            assert_eq!(a_hit.region, b_hit.region);
+            assert_eq!(a_hit.row, b_hit.row);
+            assert_eq!(a_hit.column, b_hit.column);
+        }
+    }
+}
+
 #[test]
 fn test_decoding_single_event() {
-    //
     let event = fake_event_simple();
 
     let (packet, last_trailer_idx) = decode_event(&event).unwrap();
@@ -620,33 +637,41 @@ fn test_debug_decode_noise_all_region() {
 }
 
 #[test]
-fn test_compare_result() {
+fn test_compare_result_noise_all_region() {
     pyo3::prepare_freethreaded_python();
 
     let bytes = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE_ALL_REGION)).unwrap();
 
+    // Compare debug_decode_all_events and decode_all_events
     let (debug_packets, debug_last_trailer_idx, _invalid_words) =
         moss_decoder::debug_decode_all_events(&bytes).unwrap();
+    let (decode_all_events_packets, decode_all_events_last_trailer_idx) =
+        moss_decoder::decode_all_events(&bytes).unwrap();
 
-    let (packets2, last_trailer_idx2) = moss_decoder::decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, decode_all_events_last_trailer_idx);
+    assert_eq!(debug_packets.len(), NOISE_ALL_REGION_PACKETS);
+    assert_eq!(
+        NOISE_ALL_REGION_HITS,
+        decode_all_events_packets
+            .iter()
+            .fold(0, |acc, p| acc + p.hits.len())
+    );
 
-    assert_eq!(debug_packets.len(), packets2.len());
-    assert_eq!(debug_last_trailer_idx, last_trailer_idx2);
+    compare_all_packets(&debug_packets, &decode_all_events_packets);
 
-    for (i, debug_packet) in debug_packets.iter().enumerate() {
-        let packet2 = &packets2[i];
-        assert_eq!(debug_packet.unit_id, packet2.unit_id);
-        assert_eq!(debug_packet.hits.len(), packet2.hits.len());
-        for (j, debug_hit) in debug_packet.hits.iter().enumerate() {
-            let hit2 = &packet2.hits[j];
+    // Compare decode_from_file and decode_all_events
+    let packets = moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.into()).unwrap();
+    compare_all_packets(&packets, &decode_all_events_packets);
 
-            assert_eq!(debug_hit.region, hit2.region);
-            assert_eq!(debug_hit.row, hit2.row);
-            assert_eq!(debug_hit.column, hit2.column);
-        }
-    }
+    let (packets, remainder) = moss_decoder::skip_n_take_all(&bytes, 0).unwrap();
+    let packets = packets.unwrap();
+    assert!(remainder.is_none());
 
-    // let packets = moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.into()).unwrap();
+    compare_all_packets(&packets, &decode_all_events_packets);
 
-    // assert_eq!(packets.len(), packets2.len());
+    // Compare decode_n_events and decode_all_events
+    let (packets, last_trailer_idx) =
+        moss_decoder::decode_n_events(&bytes, 1000, None, None).unwrap();
+    assert_eq!(last_trailer_idx, debug_last_trailer_idx);
+    compare_all_packets(&packets, &decode_all_events_packets);
 }
