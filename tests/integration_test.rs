@@ -6,6 +6,9 @@ use pretty_assertions::assert_eq;
 const FILE_MOSS_NOISE: &str = "tests/test-data/moss_noise.raw";
 const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
 const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
+
+const NOISE_ALL_REGION_PACKETS: usize = 1000;
+const NOISE_ALL_REGION_HITS: usize = 6085;
 const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
 const FILE_NOISE_RANDOM_REGION: &str = "tests/test-data/noise_random_region.raw";
 const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw";
@@ -173,22 +176,19 @@ fn test_decode_from_file() {
 
 #[test]
 fn test_decode_from_file_noise_all_region() {
-    let expect_packets = 1000;
-    let expect_hits = 6085;
-
     let packets =
         moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.to_string().into()).unwrap();
     assert_eq!(
         packets.len(),
-        expect_packets,
-        "Expected {expect_packets} packets, got {}",
+        NOISE_ALL_REGION_PACKETS,
+        "Expected {NOISE_ALL_REGION_PACKETS} packets, got {}",
         packets.len()
     );
     // Count total hits
     let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
     assert_eq!(
-        total_hits, expect_hits,
-        "Expected {expect_hits} hits, got {total_hits}",
+        total_hits, NOISE_ALL_REGION_HITS,
+        "Expected {NOISE_ALL_REGION_HITS} hits, got {total_hits}",
     );
 }
 
@@ -576,4 +576,77 @@ fn test_decode_split_events_from_file_spillover() {
     let p2 = std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START);
     let res = decode_n_events_from_file(p2.clone(), take, None, remainder);
     assert_eq!(res.unwrap().len(), 2);
+}
+
+#[test]
+fn test_debug_decode_noise_all_region() {
+    pyo3::prepare_freethreaded_python();
+
+    let time = std::time::Instant::now();
+
+    let bytes = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE_ALL_REGION)).unwrap();
+
+    let res = moss_decoder::debug_decode_all_events(&bytes);
+
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    let (packets, last_trailer_idx, invalid_words) = res.unwrap();
+
+    println!("Got: {packets} packets", packets = packets.len());
+    println!(
+        "Last trailer at index: {last_trailer_idx}/{}",
+        bytes.len() - 1
+    );
+    println!(
+        "Got: {invalid_words} invalid words",
+        invalid_words = invalid_words.len()
+    );
+
+    assert_eq!(packets.len(), NOISE_ALL_REGION_PACKETS);
+    assert_eq!(
+        last_trailer_idx,
+        bytes.len() - 2,
+        "Last 10 bytes of file: {:X?}",
+        bytes.get(bytes.len() - 10..)
+    );
+    assert_eq!(invalid_words.len(), 0);
+
+    // Count total hits
+    let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, NOISE_ALL_REGION_HITS,
+        "Expected {NOISE_ALL_REGION_HITS} hits, got {total_hits}",
+    );
+}
+
+#[test]
+fn test_compare_result() {
+    pyo3::prepare_freethreaded_python();
+
+    let bytes = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE_ALL_REGION)).unwrap();
+
+    let (debug_packets, debug_last_trailer_idx, _invalid_words) =
+        moss_decoder::debug_decode_all_events(&bytes).unwrap();
+
+    let (packets2, last_trailer_idx2) = moss_decoder::decode_all_events(&bytes).unwrap();
+
+    assert_eq!(debug_packets.len(), packets2.len());
+    assert_eq!(debug_last_trailer_idx, last_trailer_idx2);
+
+    for (i, debug_packet) in debug_packets.iter().enumerate() {
+        let packet2 = &packets2[i];
+        assert_eq!(debug_packet.unit_id, packet2.unit_id);
+        assert_eq!(debug_packet.hits.len(), packet2.hits.len());
+        for (j, debug_hit) in debug_packet.hits.iter().enumerate() {
+            let hit2 = &packet2.hits[j];
+
+            assert_eq!(debug_hit.region, hit2.region);
+            assert_eq!(debug_hit.row, hit2.row);
+            assert_eq!(debug_hit.column, hit2.column);
+        }
+    }
+
+    // let packets = moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.into()).unwrap();
+
+    // assert_eq!(packets.len(), packets2.len());
 }
