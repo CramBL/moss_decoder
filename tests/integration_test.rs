@@ -7,12 +7,20 @@ const FILE_MOSS_NOISE: &str = "tests/test-data/moss_noise.raw";
 const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
 const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
 
+const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
 const NOISE_ALL_REGION_PACKETS: usize = 1000;
 const NOISE_ALL_REGION_HITS: usize = 6085;
-const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
+const NOISE_ALL_REGION_LAST_TRAILER_IDX: usize = 26542;
 
 const FILE_NOISE_RANDOM_REGION: &str = "tests/test-data/noise_random_region.raw";
+const NOISE_RANDOM_REGION_PACKETS: usize = 1044;
+const NOISE_RANDOM_REGION_HITS: usize = 5380;
+const NOISE_RANDOM_REGION_LAST_TRAILER_IDX: usize = 22696;
+
 const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw";
+const PATTERN_ALL_REGIONS_PACKETS: usize = 1000;
+const PATTERN_ALL_REGIONS_HITS: usize = 4000;
+const PATTERN_ALL_REGIONS_LAST_TRAILER_IDX: usize = 19997;
 
 // Utility to compare all packets in two vectors (for comparing result of different decoding methods)
 fn compare_all_packets(a_packets: &[MossPacket], b_packets: &[MossPacket]) {
@@ -44,8 +52,13 @@ fn compare_all_decoding_methods(
     // Do an initial comparison with the simple naive decoder and the expected values
     let (debug_packets, debug_last_trailer_idx, _invalid_words) =
         moss_decoder::debug_decode_all_events(&bytes).unwrap();
-    assert_eq!(debug_last_trailer_idx, expect_trailer_idx);
-    assert_eq!(debug_packets.len(), expect_packets);
+    assert_eq!(debug_last_trailer_idx, expect_trailer_idx, "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx}, expected: {expect_trailer_idx}. From trailer index to end of bytes: {remainder:#X?}", remainder = bytes.get(debug_last_trailer_idx..).unwrap());
+    assert_eq!(
+        debug_packets.len(),
+        expect_packets,
+        "Unexpected number of packets, got {packets}, expected {expect_packets}",
+        packets = debug_packets.len()
+    );
     assert_eq!(
         debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
         expect_hits
@@ -688,6 +701,28 @@ fn test_compare_result_noise_all_region() {
         FILE_MOSS_NOISE_ALL_REGION,
         NOISE_ALL_REGION_PACKETS,
         NOISE_ALL_REGION_HITS,
-        26542,
+        NOISE_ALL_REGION_LAST_TRAILER_IDX,
+    );
+}
+
+#[test]
+fn test_compare_result_noise_random_region() {
+    pyo3::prepare_freethreaded_python();
+    compare_all_decoding_methods(
+        FILE_NOISE_RANDOM_REGION,
+        NOISE_RANDOM_REGION_PACKETS,
+        NOISE_RANDOM_REGION_HITS,
+        NOISE_RANDOM_REGION_LAST_TRAILER_IDX,
+    );
+}
+
+#[test]
+fn test_compare_result_pattern_all_regions() {
+    pyo3::prepare_freethreaded_python();
+    compare_all_decoding_methods(
+        FILE_PATTERN_ALL_REGIONS,
+        PATTERN_ALL_REGIONS_PACKETS,
+        PATTERN_ALL_REGIONS_HITS,
+        PATTERN_ALL_REGIONS_LAST_TRAILER_IDX,
     );
 }
