@@ -1,4 +1,8 @@
-use crate::{moss_protocol::MossWord, MossHit, MossPacket};
+use crate::{
+    moss_protocol::MossWord,
+    parse_error::{ParseError, ParseErrorKind},
+    MossHit, MossPacket,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct InvalidWordInfo {
@@ -45,7 +49,7 @@ impl InvalidWordInfo {
 #[inline]
 pub(crate) fn debug_decode_event(
     bytes: &[u8],
-) -> std::io::Result<(MossPacket, usize, Vec<InvalidWordInfo>)> {
+) -> Result<(MossPacket, usize, Vec<InvalidWordInfo>), (ParseError, Vec<InvalidWordInfo>)> {
     const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
     let mut moss_packet = MossPacket {
         unit_id: INVALID_NO_HEADER_SEEN, // placeholder
@@ -172,10 +176,23 @@ pub(crate) fn debug_decode_event(
             }
         }
     }
-    if moss_packet.unit_id == INVALID_NO_HEADER_SEEN || trailer_idx == 0 {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "No MOSS packet found",
+    if moss_packet.unit_id == INVALID_NO_HEADER_SEEN {
+        Err((
+            ParseError::new(
+                ParseErrorKind::NoHeaderFound,
+                "Reached end with no Header found",
+                0,
+            ),
+            invalid_words,
+        ))
+    } else if trailer_idx == 0 {
+        Err((
+            ParseError::new(
+                ParseErrorKind::EndOfBufferNoTrailer,
+                "Header seen but reached end of event with no trailer found",
+                0,
+            ),
+            invalid_words,
         ))
     } else {
         Ok((moss_packet, trailer_idx, invalid_words))
