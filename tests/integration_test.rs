@@ -24,7 +24,14 @@ const PATTERN_ALL_REGIONS_HITS: usize = 4000;
 const PATTERN_ALL_REGIONS_LAST_TRAILER_IDX: usize = 19997;
 
 const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
+const FOUR_EVENTS_PARTIAL_END_PACKETS: usize = 4;
+const FOUR_EVENTS_PARTIAL_END_HITS: usize = 128;
+const FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX: usize = 456;
+
 const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
+const THREE_EVENTS_PARTIAL_START_PACKETS: usize = 3;
+const THREE_EVENTS_PARTIAL_START_HITS: usize = 8;
+const THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX: usize = 999;
 
 // Utility to compare all packets in two vectors (for comparing result of different decoding methods)
 fn compare_all_packets(a_packets: &[MossPacket], b_packets: &[MossPacket]) {
@@ -54,7 +61,7 @@ fn compare_all_decoding_methods(
     let bytes = std::fs::read(std::path::PathBuf::from(test_file)).unwrap();
 
     // Do an initial comparison with the simple naive decoder and the expected values
-    let (debug_packets, debug_last_trailer_idx, _invalid_words) =
+    let (debug_packets, debug_last_trailer_idx, invalid_words) =
         moss_decoder::debug_decode_all_events(&bytes).unwrap();
     assert_eq!(debug_last_trailer_idx, expect_trailer_idx, "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx}, expected: {expect_trailer_idx}. From trailer index to end of bytes: {remainder:#X?}", remainder = bytes.get(debug_last_trailer_idx..).unwrap());
     assert_eq!(
@@ -67,6 +74,7 @@ fn compare_all_decoding_methods(
         debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
         expect_hits
     );
+    assert_eq!(invalid_words.len(), 0);
 
     // Then use that result to compare with the other decoding methods
 
@@ -740,4 +748,55 @@ fn test_compare_result_moss_noise() {
         MOSS_NOISE_HITS,
         MOSS_NOISE_LAST_TRAILER_IDX,
     );
+}
+
+#[test]
+fn test_compare_result_4_events_partial_end() {
+    pyo3::prepare_freethreaded_python();
+    let bytes = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
+
+    // Do an initial comparison with the simple naive decoder and the expected values
+    let (debug_packets, debug_last_trailer_idx, invalid_words) =
+        moss_decoder::debug_decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX, "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx}, expected: {FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX}. From trailer index to end of bytes: {remainder:#X?}", remainder = bytes.get(debug_last_trailer_idx..).unwrap());
+    assert_eq!(
+        debug_packets.len(),
+        FOUR_EVENTS_PARTIAL_END_PACKETS,
+        "Unexpected number of packets, got {packets}, expected {FOUR_EVENTS_PARTIAL_END_PACKETS}",
+        packets = debug_packets.len()
+    );
+    assert_eq!(
+        debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
+        FOUR_EVENTS_PARTIAL_END_HITS
+    );
+    assert_eq!(invalid_words.len(), 0);
+
+    // Then use that result to compare with the other decoding methods
+
+    // Check moss_decoder::decode_all_events
+    match moss_decoder::decode_all_events(&bytes) {
+        Ok((decode_all_events_packets, decode_all_events_last_trailer_idx)) => panic!("This should have failed, got {decode_all_events_packets:?} packets, last trailer index: {decode_all_events_last_trailer_idx}"),
+        Err(e) => {println!("Got error: {e}"); assert!(e.to_string().contains("Failed decoding packet #5"))},
+    }
+    assert_eq!(debug_last_trailer_idx, debug_last_trailer_idx);
+    compare_all_packets(&debug_packets, &debug_packets);
+
+    // Check moss_decoder::decode_from_file
+    let packets = moss_decoder::decode_from_file(FILE_4_EVENTS_PARTIAL_END.into()).unwrap();
+    compare_all_packets(&packets, &debug_packets);
+
+    // Check moss_decoder::skip_n_take_all
+    let (packets, remainder) = moss_decoder::skip_n_take_all(&bytes, 0).unwrap();
+    let packets = packets.unwrap();
+    assert!(remainder.is_some());
+    assert!(
+        remainder.unwrap().len() == bytes.len() - (FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX + 1)
+    );
+    compare_all_packets(&packets, &debug_packets);
+
+    // Check moss_decoder::decode_n_events
+    let (packets, last_trailer_idx) =
+        moss_decoder::decode_n_events(&bytes, FOUR_EVENTS_PARTIAL_END_PACKETS, None, None).unwrap();
+    assert_eq!(last_trailer_idx, debug_last_trailer_idx);
+    compare_all_packets(&packets, &debug_packets);
 }
