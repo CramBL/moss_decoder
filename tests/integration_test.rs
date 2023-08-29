@@ -78,6 +78,17 @@ fn compare_all_decoding_methods(
 
     // Then use that result to compare with the other decoding methods
 
+    // Check moss_decoder::debug_decode_all_events_from_file
+    let (debug_packets_from_file, debug_last_trailer_idx_from_file, invalid_words_from_file) =
+        moss_decoder::debug_decode_all_events_from_file(test_file.into()).unwrap();
+    assert_eq!(
+        debug_last_trailer_idx_from_file, debug_last_trailer_idx,
+        "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx_from_file}, expected: {debug_last_trailer_idx}. From trailer index to end of bytes: {remainder:#X?}",
+        remainder = bytes.get(debug_last_trailer_idx_from_file..).unwrap()
+    );
+    compare_all_packets(&debug_packets, &debug_packets_from_file);
+    assert_eq!(invalid_words_from_file.len(), 0);
+
     // Check moss_decoder::decode_all_events
     let (decode_all_events_packets, decode_all_events_last_trailer_idx) =
         moss_decoder::decode_all_events(&bytes).unwrap();
