@@ -339,7 +339,11 @@ def test_fundamental_class_comparisons():
 
 
 def test_debug_decode_events(
-    test_file: Path, expect_trailer_idx: int, expect_packets: int, expect_hits: int
+    test_file: Path,
+    expect_trailer_idx: int,
+    expect_packets: int,
+    expect_hits: int,
+    expect_invalid_words: int,
 ):
     print(f"=== Testing debug_decode_events with file: {test_file} ===")
     print(
@@ -377,6 +381,9 @@ def test_debug_decode_events(
     assert (
         total_hits_from_file == total_hits
     ), f"Mismatch in total hits decoding from file vs. memory: {total_hits_from_file} != {total_hits})"
+    assert len(invalid_words) == len(
+        invalid_words_from_file
+    ), f"Mismatch in invalid word count decoding from file vs. memory: {len(invalid_words)} != {len(invalid_words_from_file)})"
 
     # Then check vs. the expected count
     assert (
@@ -387,6 +394,15 @@ def test_debug_decode_events(
     ), f"Got {len(packets)}, expected {expect_packets}"
 
     assert total_hits == expect_hits, f"expected {expect_hits}, got {total_hits}"
+    assert (
+        len(invalid_words) == expect_invalid_words
+    ), f"expected {expect_invalid_words} invalid words, got: {len(invalid_words)}"
+
+    if len(invalid_words) > 0:
+        print("\tdebug decoding returned invalid words:")
+        for invalid_word in invalid_words:
+            print(f"\t\t{invalid_word}")
+
     print("==> Test OK\n\n")
 
 
@@ -439,17 +455,51 @@ if __name__ == "__main__":
     print(f"Done in: {time.time()-start:.3f} s\n")
 
     test_debug_decode_events(
-        test_file=FILE_MOSS_NOISE_ALL_REGION,
-        expect_trailer_idx=NOISE_ALL_REGION_LAST_TRAILER_IDX,
-        expect_packets=NOISE_ALL_REGION_PACKETS,
-        expect_hits=NOISE_ALL_REGION_HITS,
-    )
-
-    test_debug_decode_events(
         test_file=FILE_MOSS_NOISE,
         expect_trailer_idx=MOSS_NOISE_LAST_TRAILER_IDX,
         expect_packets=MOSS_NOISE_PACKETS,
         expect_hits=MOSS_NOISE_HITS,
+        expect_invalid_words=0,
+    )
+
+    test_debug_decode_events(
+        test_file=FILE_MOSS_NOISE_ALL_REGION,
+        expect_trailer_idx=NOISE_ALL_REGION_LAST_TRAILER_IDX,
+        expect_packets=NOISE_ALL_REGION_PACKETS,
+        expect_hits=NOISE_ALL_REGION_HITS,
+        expect_invalid_words=0,
+    )
+
+    test_debug_decode_events(
+        test_file=FILE_NOISE_RANDOM_REGION,
+        expect_trailer_idx=NOISE_RANDOM_REGION_LAST_TRAILER_IDX,
+        expect_packets=NOISE_RANDOM_REGION_PACKETS,
+        expect_hits=NOISE_RANDOM_REGION_HITS,
+        expect_invalid_words=0,
+    )
+
+    test_debug_decode_events(
+        test_file=FILE_PATTERN_ALL_REGIONS,
+        expect_trailer_idx=PATTERN_ALL_REGIONS_LAST_TRAILER_IDX,
+        expect_packets=PATTERN_ALL_REGIONS_PACKETS,
+        expect_hits=PATTERN_ALL_REGIONS_HITS,
+        expect_invalid_words=0,
+    )
+
+    test_debug_decode_events(
+        test_file=FILE_4_EVENTS_PARTIAL_END,
+        expect_trailer_idx=FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX,
+        expect_packets=FOUR_EVENTS_PARTIAL_END_PACKETS,
+        expect_hits=FOUR_EVENTS_PARTIAL_END_HITS,
+        expect_invalid_words=0,
+    )
+
+    test_debug_decode_events(
+        test_file=FILE_3_EVENTS_PARTIAL_START,
+        expect_trailer_idx=THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX,
+        expect_packets=THREE_EVENTS_PARTIAL_START_PACKETS,
+        expect_hits=THREE_EVENTS_PARTIAL_START_HITS,
+        expect_invalid_words=108,
     )
 
     test_decode_1GB_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
