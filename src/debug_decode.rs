@@ -30,7 +30,14 @@ impl InvalidWordInfo {
         let (describe_decode_state, region_description) = if self.in_packet {
             (
                 "in MOSS event",
-                Some(format!(", region {}", self.region.unwrap())), // safe to unwrap because in_packet is true
+                Some(format!(
+                    ", region {}",
+                    if self.region.unwrap() == 0xFF {
+                        "unknown".to_string()
+                    } else {
+                        format!("{}", self.region.unwrap())
+                    }
+                )), // safe to unwrap because in_packet is true
             )
         } else {
             ("before header seen", None)
@@ -328,5 +335,27 @@ mod tests {
             invalid_words_msgs[0],
             "Invalid word=0xFB at index=55 in MOSS event, region 0",
         );
+    }
+
+    #[test]
+    fn test_debug_decode_event_invalid_before_region_header() {
+        pyo3::prepare_freethreaded_python();
+        let mut event_data_packet = fake_event_simple();
+        event_data_packet.insert(1, 0xFB);
+
+        let res = debug_decode_event(&event_data_packet);
+        assert!(res.is_ok());
+        let (moss_packet, trailer_idx, invalid_words) = res.unwrap();
+
+        println!("invalid_words: {:#X?}", invalid_words);
+        println!("Invalid word: {}", invalid_words[0].to_error_msg());
+
+        assert_eq!(moss_packet.unit_id, 1);
+        assert_eq!(moss_packet.hits.len(), 4);
+        assert_eq!(trailer_idx, 19);
+        assert_eq!(invalid_words.len(), 1);
+        assert_eq!(invalid_words[0].invalid_byte, 0xFB);
+        assert!(invalid_words[0].in_packet);
+        assert!(invalid_words[0].to_error_msg().contains("region unknown"));
     }
 }
