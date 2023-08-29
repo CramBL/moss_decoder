@@ -29,7 +29,7 @@ impl InvalidWordInfo {
     pub(crate) fn to_error_msg(self) -> String {
         let (describe_decode_state, region_description) = if self.in_packet {
             (
-                "in MOSS packet",
+                "in MOSS event",
                 Some(format!(", region {}", self.region.unwrap())), // safe to unwrap because in_packet is true
             )
         } else {
@@ -283,7 +283,7 @@ mod tests {
         assert_eq!(invalid_words.len(), 1);
         assert_eq!(
             invalid_words_msgs[0],
-            "Invalid word=0xFB at index=34 in MOSS packet, region 0",
+            "Invalid word=0xFB at index=34 in MOSS event, region 0",
         );
         assert_eq!(invalid_words[0].index, 34);
         assert_eq!(data_two_packets[invalid_words[0].index], 0xFB);
@@ -326,7 +326,7 @@ mod tests {
         assert_eq!(invalid_words[0].index, 55);
         assert_eq!(
             invalid_words_msgs[0],
-            "Invalid word=0xFB at index=55 in MOSS packet, region 0",
+            "Invalid word=0xFB at index=55 in MOSS event, region 0",
         );
     }
 }
