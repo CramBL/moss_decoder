@@ -9,14 +9,34 @@ from moss_decoder import MossPacket, MossHit
 from moss_decoder import decode_event
 
 FILE_MOSS_NOISE = Path("tests/test-data/moss_noise.raw")
+MOSS_NOISE_PACKETS: int = 100000
+MOSS_NOISE_HITS: int = 2716940
+MOSS_NOISE_LAST_TRAILER_IDX: int = 9582574
+
 FILE_MOSS_NOISE_ALL_REGION = Path("tests/test-data/noise_all_regions.raw")
 NOISE_ALL_REGION_PACKETS: int = 1000
 NOISE_ALL_REGION_HITS: int = 6085
 NOISE_ALL_REGION_LAST_TRAILER_IDX: int = 26542
+
 FILE_NOISE_RANDOM_REGION = Path("tests/test-data/noise_random_region.raw")
+NOISE_RANDOM_REGION_PACKETS: int = 1044
+NOISE_RANDOM_REGION_HITS: int = 5380
+NOISE_RANDOM_REGION_LAST_TRAILER_IDX: int = 22696
+
 FILE_PATTERN_ALL_REGIONS = Path("tests/test-data/pattern_all_regions.raw")
+PATTERN_ALL_REGIONS_PACKETS: int = 1000
+PATTERN_ALL_REGIONS_HITS: int = 4000
+PATTERN_ALL_REGIONS_LAST_TRAILER_IDX: int = 19997
+
 FILE_4_EVENTS_PARTIAL_END = Path("tests/test-data/moss_noise_0-499b.raw")
+FOUR_EVENTS_PARTIAL_END_PACKETS: int = 4
+FOUR_EVENTS_PARTIAL_END_HITS: int = 128
+FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX: int = 456
+
 FILE_3_EVENTS_PARTIAL_START = Path("tests/test-data/moss_noise_500-999b.raw")
+THREE_EVENTS_PARTIAL_START_PACKETS: int = 3
+THREE_EVENTS_PARTIAL_START_HITS: int = 77
+THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX: int = 379
 
 
 class MockMossDecoder:
