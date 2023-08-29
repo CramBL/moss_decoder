@@ -4,8 +4,9 @@ use moss_decoder::*;
 use pretty_assertions::assert_eq;
 
 const FILE_MOSS_NOISE: &str = "tests/test-data/moss_noise.raw";
-const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
-const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
+const MOSS_NOISE_PACKETS: usize = 100000;
+const MOSS_NOISE_HITS: usize = 2716940;
+const MOSS_NOISE_LAST_TRAILER_IDX: usize = 9582574;
 
 const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
 const NOISE_ALL_REGION_PACKETS: usize = 1000;
@@ -21,6 +22,9 @@ const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw"
 const PATTERN_ALL_REGIONS_PACKETS: usize = 1000;
 const PATTERN_ALL_REGIONS_HITS: usize = 4000;
 const PATTERN_ALL_REGIONS_LAST_TRAILER_IDX: usize = 19997;
+
+const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
+const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
 
 // Utility to compare all packets in two vectors (for comparing result of different decoding methods)
 fn compare_all_packets(a_packets: &[MossPacket], b_packets: &[MossPacket]) {
@@ -724,5 +728,16 @@ fn test_compare_result_pattern_all_regions() {
         PATTERN_ALL_REGIONS_PACKETS,
         PATTERN_ALL_REGIONS_HITS,
         PATTERN_ALL_REGIONS_LAST_TRAILER_IDX,
+    );
+}
+
+#[test]
+fn test_compare_result_moss_noise() {
+    pyo3::prepare_freethreaded_python();
+    compare_all_decoding_methods(
+        FILE_MOSS_NOISE,
+        MOSS_NOISE_PACKETS,
+        MOSS_NOISE_HITS,
+        MOSS_NOISE_LAST_TRAILER_IDX,
     );
 }
