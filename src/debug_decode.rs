@@ -86,6 +86,7 @@ pub(crate) fn debug_decode_event(
             MossWord::UnitFrameTrailer => {
                 if is_moss_packet {
                     trailer_idx = i;
+                    break;
                 } else {
                     invalid_words.push(record_protocol_error(InvalidWordInfo::new(
                         *byte,
@@ -94,7 +95,6 @@ pub(crate) fn debug_decode_event(
                         i,
                     )));
                 }
-                break;
             }
             MossWord::RegionHeader => {
                 if is_moss_packet {
