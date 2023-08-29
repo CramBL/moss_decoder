@@ -505,11 +505,7 @@ pub fn debug_decode_all_events(
                     )))?;
                 }
             }
-            Err((parse_err, new_invalid_words)) => {
-                eprintln!(
-                    "Failed decoding packet #{packet_cnt}: {parse_err}",
-                    packet_cnt = moss_packets.len() + 1
-                );
+            Err((_parse_err, new_invalid_words)) => {
                 new_invalid_words.into_iter().for_each(|mut invalid_word| {
                     invalid_word.set_index_offset(last_trailer_idx);
                     invalid_words.push(invalid_word);
