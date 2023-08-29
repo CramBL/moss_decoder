@@ -142,21 +142,34 @@ pub fn debug_decode_all_events(
     let mut last_trailer_idx = 0;
     let mut invalid_words = Vec::new();
 
-    while let Ok((new_moss_packet, trailer_idx, new_invalid_words)) =
-        debug_decode::debug_decode_event(&bytes[last_trailer_idx..])
-    {
-        new_invalid_words.into_iter().for_each(|mut invalid_word| {
-            invalid_word.set_index_offset(last_trailer_idx);
-            invalid_words.push(invalid_word);
-        });
-        last_trailer_idx += trailer_idx + 1;
-        moss_packets.push(new_moss_packet);
+    loop {
+        match debug_decode::debug_decode_event(&bytes[last_trailer_idx..]) {
+            Ok((new_moss_packet, trailer_idx, new_invalid_words)) => {
+                new_invalid_words.into_iter().for_each(|mut invalid_word| {
+                    invalid_word.set_index_offset(last_trailer_idx);
+                    invalid_words.push(invalid_word);
+                });
+                last_trailer_idx += trailer_idx + 1;
+                moss_packets.push(new_moss_packet);
 
-        if invalid_words.len() > MAX_REPORT_ERRORS {
-            Err(PyAssertionError::new_err(format!(
-                "Too many errors to report: {num_errors}",
-                num_errors = invalid_words.len()
-            )))?;
+                if invalid_words.len() > MAX_REPORT_ERRORS {
+                    Err(PyAssertionError::new_err(format!(
+                        "Too many errors to report: {num_errors}",
+                        num_errors = invalid_words.len()
+                    )))?;
+                }
+            }
+            Err((parse_err, new_invalid_words)) => {
+                eprintln!(
+                    "Failed decoding packet #{packet_cnt}: {parse_err}",
+                    packet_cnt = moss_packets.len() + 1
+                );
+                new_invalid_words.into_iter().for_each(|mut invalid_word| {
+                    invalid_word.set_index_offset(last_trailer_idx);
+                    invalid_words.push(invalid_word);
+                });
+                break;
+            }
         }
     }
 
