@@ -345,18 +345,23 @@ def test_debug_decode_events(
         f"Expecting last trailer index={expect_trailer_idx}, packets={expect_packets}, hits={expect_hits}"
     )
     # First decode from file and from in memory bytes and check that they match
+    start = time.time()
     (
         packets_from_file,
         last_trailer_idx_from_file,
         invalid_words_from_file,
     ) = moss_decoder.debug_decode_all_events_from_file(test_file)
-
+    print(
+        f"Decoded {len(packets_from_file)} packets from file in: {time.time()-start:.3f} s\n"
+    )
+    start = time.time()
     test_data = read_bytes_from_file(file_path=test_file)
     (
         packets,
         last_trailer_idx,
         invalid_words,
     ) = moss_decoder.debug_decode_all_events(test_data)
+    print(f"Decoded {len(packets)} packets from memory in: {time.time()-start:.3f} s\n")
 
     assert (
         last_trailer_idx_from_file == last_trailer_idx
@@ -430,11 +435,18 @@ if __name__ == "__main__":
     test_moss_packet_print()
     print(f"Done in: {time.time()-start:.3f} s\n")
 
-    test_decode_1GB_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
-
     test_debug_decode_events(
         test_file=FILE_MOSS_NOISE_ALL_REGION,
         expect_trailer_idx=NOISE_ALL_REGION_LAST_TRAILER_IDX,
         expect_packets=NOISE_ALL_REGION_PACKETS,
         expect_hits=NOISE_ALL_REGION_HITS,
     )
+
+    test_debug_decode_events(
+        test_file=FILE_MOSS_NOISE,
+        expect_trailer_idx=MOSS_NOISE_LAST_TRAILER_IDX,
+        expect_packets=MOSS_NOISE_PACKETS,
+        expect_hits=MOSS_NOISE_HITS,
+    )
+
+    test_decode_1GB_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
