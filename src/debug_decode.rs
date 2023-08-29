@@ -32,7 +32,7 @@ impl InvalidWordInfo {
             ("before header seen", None)
         };
         format!(
-            "Invalid word={byte:#X} at index={i} {describe_decode_state}{opt_region}",
+            "Invalid word=0x{byte:02X} at index={i} {describe_decode_state}{opt_region}",
             byte = self.invalid_byte,
             i = self.index,
             describe_decode_state = describe_decode_state,
@@ -60,56 +60,115 @@ pub(crate) fn debug_decode_event(
 
     for (i, byte) in bytes.iter().enumerate() {
         match MossWord::from_byte(*byte) {
-            MossWord::Idle => (),
+            MossWord::Idle => {
+                if !is_moss_packet {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                }
+            }
             MossWord::UnitFrameHeader => {
-                debug_assert!(!is_moss_packet);
-                is_moss_packet = true;
-                moss_packet.unit_id = *byte & 0x0F
+                if is_moss_packet {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                } else {
+                    is_moss_packet = true;
+                    moss_packet.unit_id = *byte & 0x0F
+                }
             }
             MossWord::UnitFrameTrailer => {
-                debug_assert!(
-                    is_moss_packet,
-                    "Trailer seen before header, next 10 bytes: {:#X?}",
-                    &bytes[i..i + 10]
-                );
-                trailer_idx = i;
+                if is_moss_packet {
+                    trailer_idx = i;
+                } else {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                }
                 break;
             }
             MossWord::RegionHeader => {
-                debug_assert!(
-                is_moss_packet,
-                "Region header seen before frame header at index {i}, current and next 9 bytes:\n {:#X?}",
-            &bytes[i..i + 10]
-            );
-                current_region = *byte & 0x03;
+                if is_moss_packet {
+                    current_region = *byte & 0x03;
+                } else {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                }
             }
             MossWord::Data0 => {
-                debug_assert!(is_moss_packet);
-                moss_packet.hits.push(MossHit {
-                    region: current_region,            // region id
-                    row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
-                    column: 0,                         // placeholder
-                });
+                if is_moss_packet {
+                    moss_packet.hits.push(MossHit {
+                        region: current_region,            // region id
+                        row: ((*byte & 0x3F) as u16) << 3, // row position [8:3]
+                        column: 0,                         // placeholder
+                    });
+                } else {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                }
             }
             MossWord::Data1 => {
-                debug_assert!(is_moss_packet);
-                // row position [2:0]
-                moss_packet.hits.last_mut().unwrap().row |= ((*byte & 0x38) >> 3) as u16;
-                // col position [8:6]
-                moss_packet.hits.last_mut().unwrap().column = ((*byte & 0x07) as u16) << 6;
+                if is_moss_packet {
+                    // row position [2:0]
+                    moss_packet.hits.last_mut().unwrap().row |= ((*byte & 0x38) >> 3) as u16;
+                    // col position [8:6]
+                    moss_packet.hits.last_mut().unwrap().column = ((*byte & 0x07) as u16) << 6;
+                } else {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                }
             }
             MossWord::Data2 => {
-                debug_assert!(is_moss_packet);
-                moss_packet.hits.last_mut().unwrap().column |= (*byte & 0x3F) as u16;
+                if is_moss_packet {
+                    moss_packet.hits.last_mut().unwrap().column |= (*byte & 0x3F) as u16;
+                } else {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                }
                 // col position [5:0]
             }
             MossWord::Delimiter => {
-                debug_assert!(!is_moss_packet);
+                if is_moss_packet {
+                    invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                        *byte,
+                        is_moss_packet,
+                        current_region,
+                        i,
+                    )));
+                }
             }
             MossWord::ProtocolError => {
-                let invalid_word = InvalidWordInfo::new(*byte, is_moss_packet, current_region, i);
-                eprintln!("{}", invalid_word.to_error_msg());
-                invalid_words.push(invalid_word);
+                invalid_words.push(record_protocol_error(InvalidWordInfo::new(
+                    *byte,
+                    is_moss_packet,
+                    current_region,
+                    i,
+                )));
             }
         }
     }
@@ -121,6 +180,14 @@ pub(crate) fn debug_decode_event(
     } else {
         Ok((moss_packet, trailer_idx, invalid_words))
     }
+}
+
+// Single place to record protocol errors
+// useful for a single place to decide whether to print to stderr or not (or something else in the future)
+#[inline]
+fn record_protocol_error(new_invalid_word: InvalidWordInfo) -> InvalidWordInfo {
+    eprintln!("{}", new_invalid_word.to_error_msg());
+    new_invalid_word
 }
 
 #[cfg(test)]
