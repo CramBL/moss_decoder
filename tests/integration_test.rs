@@ -28,10 +28,10 @@ const FOUR_EVENTS_PARTIAL_END_PACKETS: usize = 4;
 const FOUR_EVENTS_PARTIAL_END_HITS: usize = 128;
 const FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX: usize = 456;
 
-const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
+const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events, also ends with a partial event
 const THREE_EVENTS_PARTIAL_START_PACKETS: usize = 3;
-const THREE_EVENTS_PARTIAL_START_HITS: usize = 8;
-const THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX: usize = 999;
+const THREE_EVENTS_PARTIAL_START_HITS: usize = 77;
+const THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX: usize = 379;
 
 // Utility to compare all packets in two vectors (for comparing result of different decoding methods)
 fn compare_all_packets(a_packets: &[MossPacket], b_packets: &[MossPacket]) {
@@ -778,8 +778,6 @@ fn test_compare_result_4_events_partial_end() {
         Ok((decode_all_events_packets, decode_all_events_last_trailer_idx)) => panic!("This should have failed, got {decode_all_events_packets:?} packets, last trailer index: {decode_all_events_last_trailer_idx}"),
         Err(e) => {println!("Got error: {e}"); assert!(e.to_string().contains("Failed decoding packet #5"))},
     }
-    assert_eq!(debug_last_trailer_idx, debug_last_trailer_idx);
-    compare_all_packets(&debug_packets, &debug_packets);
 
     // Check moss_decoder::decode_from_file
     let packets = moss_decoder::decode_from_file(FILE_4_EVENTS_PARTIAL_END.into()).unwrap();
@@ -799,4 +797,61 @@ fn test_compare_result_4_events_partial_end() {
         moss_decoder::decode_n_events(&bytes, FOUR_EVENTS_PARTIAL_END_PACKETS, None, None).unwrap();
     assert_eq!(last_trailer_idx, debug_last_trailer_idx);
     compare_all_packets(&packets, &debug_packets);
+}
+
+#[test]
+fn test_compare_result_3_events_partial_start() {
+    pyo3::prepare_freethreaded_python();
+    let bytes = std::fs::read(std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START)).unwrap();
+
+    // Do an initial comparison with the simple naive decoder and the expected values
+    let (debug_packets, debug_last_trailer_idx, invalid_words) =
+        moss_decoder::debug_decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX, "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx}, expected: {THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX}. From trailer index to end of bytes: {remainder:#X?}", remainder = bytes.get(debug_last_trailer_idx..).unwrap());
+    assert_eq!(
+        debug_packets.len(),
+        THREE_EVENTS_PARTIAL_START_PACKETS,
+        "Unexpected number of packets, got {packets}, expected {THREE_EVENTS_PARTIAL_START_PACKETS}",
+        packets = debug_packets.len()
+    );
+    assert_eq!(
+        debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
+        THREE_EVENTS_PARTIAL_START_HITS
+    );
+    assert_eq!(invalid_words.len(), 108);
+
+    // Then use that result to compare with the other decoding methods
+
+    // Check moss_decoder::decode_all_events
+    match moss_decoder::decode_all_events(&bytes) {
+        Ok((decode_all_events_packets, decode_all_events_last_trailer_idx)) => panic!("This should have failed, got {decode_all_events_packets:?} packets, last trailer index: {decode_all_events_last_trailer_idx}"),
+        Err(e) => {println!("Got error: {e}"); assert!(e.to_string().contains("Failed decoding packet #1"))},
+    }
+
+    // Check moss_decoder::decode_from_file
+    match moss_decoder::decode_from_file(FILE_3_EVENTS_PARTIAL_START.into()) {
+        Ok(packets) => panic!("This should have failed, got {packets:?} packets"),
+        Err(e) => {
+            println!("Got error: {e}");
+            assert!(e.to_string().contains("Failed decoding packet #1"))
+        }
+    }
+
+    // Check moss_decoder::skip_n_take_all
+    match moss_decoder::skip_n_take_all(&bytes, 0) {
+        Ok(packets) => panic!("This should have failed, got {packets:?} packets"),
+        Err(e) => {
+            println!("Got error: {e}");
+            assert!(e.to_string().contains("Failed decoding packet #1"))
+        }
+    }
+
+    // Check moss_decoder::decode_n_events
+    match moss_decoder::decode_n_events(&bytes, THREE_EVENTS_PARTIAL_START_PACKETS, None, None) {
+        Ok(packets) => panic!("This should have failed, got {packets:?} packets"),
+        Err(e) => {
+            println!("Got error: {e}");
+            assert!(e.to_string().contains("Failed decoding packet #1"))
+        }
+    }
 }
