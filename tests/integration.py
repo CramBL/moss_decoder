@@ -56,18 +56,18 @@ class MockMossDecoder:
                 skip = self._current_file_events_decoded
             else:
                 skip = None
-            print(f"Taking {events}, skipping {skip}")
+            print(f"\tTaking {events}, skipping {skip}")
             packets, last_trailer_idx = moss_decoder.decode_n_events(
                 bytes=buf, take=events, skip=skip
             )
             print(
-                f"Decoded {len(packets)} events, last trailer at index {last_trailer_idx}"
+                f"\tDecoded {len(packets)} events, last trailer at index {last_trailer_idx}"
             )
             self._current_file_events_decoded += events
             return packets
         except BytesWarning as warning:
-            print(f"Got warning: {warning}")
-            print(f"Taking all, skipping {self._current_file_events_decoded}")
+            print(f"\tGot warning: {warning}")
+            print(f"\tTaking all, skipping {self._current_file_events_decoded}")
             packets = []
             (
                 remaining_packets,
@@ -78,18 +78,18 @@ class MockMossDecoder:
 
             if remaining_packets is not None:
                 print(
-                    f"Decoded {len(remaining_packets)} events, got {len(remainder)} bytes"
+                    f"\tDecoded {len(remaining_packets)} events, got {len(remainder)} bytes"
                 )
                 packets.extend(remaining_packets)
             else:
-                print(f"Decoded 0 events, got {len(remainder)} bytes")
+                print(f"\tDecoded 0 events, got {len(remainder)} bytes")
             self._current_file_idx += 1
             self._current_file_events_decoded = 0
             if self._current_file_idx == len(self._data_files):
                 raise AssertionError(
                     f"Reached end of data before decoding {events} events"
                 )
-            print(f"Trying to get {events - len(packets)} from second file")
+            print(f"\tTrying to get {events - len(packets)} from second file")
             buf = read_bytes_from_file(self._data_files[self._current_file_idx])
 
             rest_of_packets, last_trailer_idx = moss_decoder.decode_n_events(
@@ -99,7 +99,7 @@ class MockMossDecoder:
             )
             if len(rest_of_packets) != 0:
                 self._current_file_events_decoded += len(rest_of_packets) - 1
-            print(f"Second file read, got: {len(rest_of_packets)}")
+            print(f"\tSecond file read, got: {len(rest_of_packets)}")
             packets.extend(rest_of_packets)
             return packets
 
@@ -175,16 +175,17 @@ def test_decode_1GB_file(file_path: Path, expect_packets: int):
 
 def test_decode_all_from_file(file_path: Path, expect_packets: int):
     decoder = MockMossDecoder()
-    print(f"Decoding all from file {file_path}")
+    print(f"=== Testing decoding all from file {file_path} ===")
     packets = decoder.decode_from_file(file_path)
     assert (
         len(packets) == expect_packets
     ), f"Expected {expect_packets}, got {len(packets)}"
-    print(f"Got {len(packets)} packets")
-    print("==> Test OK")
+    print(f"\tGot {len(packets)} packets")
+    print("\n==> Test OK\n\n")
 
 
 def test_decode_partial_events_from_two_files():
+    print("=== Testing decoding partial events split between files ===")
     decoder = MockMossDecoder([FILE_4_EVENTS_PARTIAL_END, FILE_3_EVENTS_PARTIAL_START])
 
     packets = decoder.get_next_n_events(2)
@@ -203,7 +204,7 @@ def test_decode_partial_events_from_two_files():
     except AssertionError as exc:
         assert "Reached end" in str(exc), f"Got unexpected error: {exc}"
 
-    print("==> Test OK\n\n")
+    print("\n==> Test OK\n\n")
 
 
 def test_decode_multi_event(path: Path, expect_remainder_bytes: int):
@@ -213,23 +214,23 @@ def test_decode_multi_event(path: Path, expect_remainder_bytes: int):
     byte_count = len(raw_bytes)
     last_byte_idx = byte_count - 1
 
-    print(f"Read {byte_count} bytes")
+    print(f"\tRead {byte_count} bytes")
 
     packets, last_trailer_idx = moss_decoder.decode_all_events(raw_bytes)
 
-    print(f"Decoded {len(packets)} packets")
+    print(f"\tDecoded {len(packets)} packets")
 
-    print(f"Last trailer at index: {last_trailer_idx}/{last_byte_idx}")
+    print(f"\tLast trailer at index: {last_trailer_idx}/{last_byte_idx}")
     remainder_count = last_byte_idx - last_trailer_idx
-    print(f"Remainder: {remainder_count} byte(s)")
+    print(f"\tRemainder: {remainder_count} byte(s)")
 
     if byte_count > last_trailer_idx:
-        print(f"Remainder byte(s): {raw_bytes[last_trailer_idx+1:]}")
+        print(f"\tRemainder byte(s): {raw_bytes[last_trailer_idx+1:]}")
 
     assert (
         remainder_count == expect_remainder_bytes
     ), f"Expected last trailer found {expect_remainder_bytes} bytes before last byte, got: {remainder_count}"
-    print("==> Test OK\n\n")
+    print("\n==> Test OK\n\n")
 
 
 def test_moss_packet_print():
@@ -237,22 +238,22 @@ def test_moss_packet_print():
     print("=== Test printing of MossPacket class ===")
     moss_event = make_simple_moss_event_packet()
     moss_packet, _rest = decode_event(moss_event)
-    print(f"type of MossPacket: {type(moss_packet)}")
-    print(f"Print MossPacket: {moss_packet}")
-    print("Print MossPacket attributes")
+    print(f"\ttype of MossPacket: {type(moss_packet)}")
+    print(f"\tPrint MossPacket: {moss_packet}")
+    print("\tPrint MossPacket attributes")
     print(f"\tUnit ID: {moss_packet.unit_id}")
-    print("Iterate over hits of the MOSS packet and print the hits")
+    print("\tIterate over hits of the MOSS packet and print the hits")
     for hit in moss_packet.hits:
         print(f"\tHits: {hit}")
 
     print("Print MOSS Hit attributes")
     for hit in moss_packet.hits:
-        print(f"\tHits: {hit}")
-        print(f"\t\tHit region: {hit.region}")
-        print(f"\t\tHit row: {hit.row}")
-        print(f"\t\tHit column: {hit.column}")
+        print(f"\t\tHits: {hit}")
+        print(f"\t\t\tHit region: {hit.region}")
+        print(f"\t\t\tHit row: {hit.row}")
+        print(f"\t\t\tHit column: {hit.column}")
 
-    print("==> Test OK\n\n")
+    print("\n==> Test OK\n\n")
 
 
 def test_100k_single_decodes():
@@ -308,33 +309,33 @@ def test_fundamental_class_comparisons():
     hit_a = MossHit(0, 1, 2)
     hit_b = MossHit(0, 1, 2)
     assert hit_a == hit_b, f"{hit_a} != {hit_b}"
-    print("__eq__ is OK")
+    print("\t__eq__ is OK")
 
-    print(repr(hit_a) + " == " + repr(hit_a))
+    print("\t" + repr(hit_a) + " == " + repr(hit_a))
     assert repr(hit_a) == repr(hit_b)
-    print("__repr__ is OK")
+    print("\t__repr__ is OK")
 
-    print(str(hit_a) + " == " + str(hit_b))
+    print("\t" + str(hit_a) + " == " + str(hit_b))
     assert str(hit_a) == str(hit_b)
 
-    print("__str__ is OK")
+    print("\t__str__ is OK")
     print("==> MossHit is OK\n\n")
 
     print("=== Comparing MossPacket attributes ===\n")
     pack_a = MossPacket(1)
     pack_b = MossPacket(1)
     assert pack_a == pack_b, f"{pack_a} != {pack_b}"
-    print("__eq__ is OK")
+    print("\t__eq__ is OK")
 
-    print(repr(pack_a) + " == " + repr(pack_b))
+    print("\t" + repr(pack_a) + " == " + repr(pack_b))
     assert repr(pack_a) == repr(pack_b)
-    print("__repr__ is OK")
+    print("\t__repr__ is OK")
 
-    print(str(pack_a) + " == " + str(pack_b))
+    print("\t" + str(pack_a) + " == " + str(pack_b))
     assert str(pack_a) == str(pack_b)
-    print("__str__ is OK")
+    print("\t__str__ is OK")
 
-    print("==> MossPacket is OK\n\n")
+    print("\n==> MossPacket is OK\n\n")
 
 
 def test_debug_decode_events(
@@ -342,7 +343,7 @@ def test_debug_decode_events(
 ):
     print(f"=== Testing debug_decode_events with file: {test_file} ===")
     print(
-        f"Expecting last trailer index={expect_trailer_idx}, packets={expect_packets}, hits={expect_hits}"
+        f"\tExpecting last trailer index={expect_trailer_idx}, packets={expect_packets}, hits={expect_hits}"
     )
     # First decode from file and from in memory bytes and check that they match
     start = time.time()
@@ -352,7 +353,7 @@ def test_debug_decode_events(
         invalid_words_from_file,
     ) = moss_decoder.debug_decode_all_events_from_file(test_file)
     print(
-        f"Decoded {len(packets_from_file)} packets from file in: {time.time()-start:.3f} s\n"
+        f"\tDecoded {len(packets_from_file)} packets from file in: {time.time()-start:.3f} s\n"
     )
     start = time.time()
     test_data = read_bytes_from_file(file_path=test_file)
@@ -361,7 +362,9 @@ def test_debug_decode_events(
         last_trailer_idx,
         invalid_words,
     ) = moss_decoder.debug_decode_all_events(test_data)
-    print(f"Decoded {len(packets)} packets from memory in: {time.time()-start:.3f} s\n")
+    print(
+        f"\tDecoded {len(packets)} packets from memory in: {time.time()-start:.3f} s\n"
+    )
 
     assert (
         last_trailer_idx_from_file == last_trailer_idx
