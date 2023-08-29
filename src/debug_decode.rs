@@ -207,7 +207,7 @@ pub(crate) fn debug_decode_event(
 // useful for a single place to decide whether to print to stderr or not (or something else in the future)
 #[inline]
 fn record_protocol_error(new_invalid_word: InvalidWordInfo) -> InvalidWordInfo {
-    eprintln!("{}", new_invalid_word.to_error_msg());
+    //eprintln!("{}", new_invalid_word.to_error_msg());
     new_invalid_word
 }
 
