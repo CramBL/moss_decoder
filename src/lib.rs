@@ -108,7 +108,7 @@ pub fn decode_all_events(bytes: &[u8]) -> PyResult<Tuple_List_MossPackets_LastTr
             }
             Err(e) => {
                 return Err(PyAssertionError::new_err(format!(
-                    "Decoding packet #{packet_cnt} failed with: {e}",
+                    "Failed decoding packet #{packet_cnt}: {e}",
                     packet_cnt = moss_packets.len() + 1
                 )))
             }
@@ -225,13 +225,13 @@ pub fn decode_from_file(path: std::path::PathBuf) -> PyResult<List_MossPackets> 
             Err((e, failed_packet_num)) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
                 return Err(PyBytesWarning::new_err(format!(
                     "Failed decoding packet #{packet_cnt}: {e}",
-                    packet_cnt = moss_packets.len() + failed_packet_num
+                    packet_cnt = moss_packets.len() + 1 + failed_packet_num
                 )));
             }
             Err((e, failed_packet_num)) => {
                 return Err(PyAssertionError::new_err(format!(
                     "Failed decoding packet #{packet_cnt}: {e}",
-                    packet_cnt = moss_packets.len() + failed_packet_num
+                    packet_cnt = moss_packets.len() + 1 + failed_packet_num
                 )))
             }
         }
@@ -287,7 +287,7 @@ pub fn decode_n_events(
             }
             Err(e) => {
                 return Err(PyAssertionError::new_err(format!(
-                    "Decoding packet {packet_cnt} failed with: {e}",
+                    "Failed decoding packet #{packet_cnt}: {e}",
                     packet_cnt = i + 1
                 )))
             }
@@ -338,7 +338,7 @@ pub fn skip_n_take_all(
             }
             Err(e) => {
                 return Err(PyAssertionError::new_err(format!(
-                    "Decoding packet #{packet_cnt} failed with: {e}",
+                    "Failed decoding packet #{packet_cnt}: {e}",
                     packet_cnt = moss_packets.len() + 1
                 )))
             }
@@ -425,13 +425,13 @@ pub fn decode_n_events_from_file(
             Err((e, failed_packet_num)) if e.kind() == ParseErrorKind::EndOfBufferNoTrailer => {
                 return Err(PyBytesWarning::new_err(format!(
                     "Failed decoding packet #{packet_cnt}: {e}",
-                    packet_cnt = moss_packets.len() + failed_packet_num
+                    packet_cnt = moss_packets.len() + 1 + failed_packet_num
                 )));
             }
             Err((e, failed_packet_num)) => {
                 return Err(PyAssertionError::new_err(format!(
                     "Failed decoding packet #{packet_cnt}: {e}",
-                    packet_cnt = moss_packets.len() + failed_packet_num
+                    packet_cnt = moss_packets.len() + 1 + failed_packet_num
                 )))
             }
         }
@@ -510,7 +510,7 @@ pub fn skip_n_take_all_from_file(
             Err((e, failed_packet_num)) => {
                 return Err(PyAssertionError::new_err(format!(
                     "Failed decoding packet #{packet_cnt}: {e}",
-                    packet_cnt = moss_packets.len() + failed_packet_num
+                    packet_cnt = moss_packets.len() + 1 + failed_packet_num
                 )))
             }
         }
