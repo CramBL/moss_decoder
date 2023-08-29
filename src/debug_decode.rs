@@ -45,11 +45,15 @@ impl InvalidWordInfo {
     }
 }
 
+type InvalidWords = Vec<InvalidWordInfo>;
+type LastTrailerIdx = usize;
+type DebugError = (ParseError, InvalidWords);
+
 /// Decodes a single MOSS event into a [MossPacket] and the index of the trailer byte (Rust only)
 #[inline]
 pub(crate) fn debug_decode_event(
     bytes: &[u8],
-) -> Result<(MossPacket, usize, Vec<InvalidWordInfo>), (ParseError, Vec<InvalidWordInfo>)> {
+) -> Result<(MossPacket, LastTrailerIdx, InvalidWords), DebugError> {
     const INVALID_NO_HEADER_SEEN: u8 = 0xFF;
     let mut moss_packet = MossPacket {
         unit_id: INVALID_NO_HEADER_SEEN, // placeholder
