@@ -4,15 +4,116 @@ use moss_decoder::*;
 use pretty_assertions::assert_eq;
 
 const FILE_MOSS_NOISE: &str = "tests/test-data/moss_noise.raw";
-const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
-const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events
+const MOSS_NOISE_PACKETS: usize = 100000;
+const MOSS_NOISE_HITS: usize = 2716940;
+const MOSS_NOISE_LAST_TRAILER_IDX: usize = 9582574;
+
 const FILE_MOSS_NOISE_ALL_REGION: &str = "tests/test-data/noise_all_regions.raw";
+const NOISE_ALL_REGION_PACKETS: usize = 1000;
+const NOISE_ALL_REGION_HITS: usize = 6085;
+const NOISE_ALL_REGION_LAST_TRAILER_IDX: usize = 26542;
+
 const FILE_NOISE_RANDOM_REGION: &str = "tests/test-data/noise_random_region.raw";
+const NOISE_RANDOM_REGION_PACKETS: usize = 1044;
+const NOISE_RANDOM_REGION_HITS: usize = 5380;
+const NOISE_RANDOM_REGION_LAST_TRAILER_IDX: usize = 22696;
+
 const FILE_PATTERN_ALL_REGIONS: &str = "tests/test-data/pattern_all_regions.raw";
+const PATTERN_ALL_REGIONS_PACKETS: usize = 1000;
+const PATTERN_ALL_REGIONS_HITS: usize = 4000;
+const PATTERN_ALL_REGIONS_LAST_TRAILER_IDX: usize = 19997;
+
+const FILE_4_EVENTS_PARTIAL_END: &str = "tests/test-data/moss_noise_0-499b.raw"; // 4 events, last event is partial ~4.5 events
+const FOUR_EVENTS_PARTIAL_END_PACKETS: usize = 4;
+const FOUR_EVENTS_PARTIAL_END_HITS: usize = 128;
+const FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX: usize = 456;
+
+const FILE_3_EVENTS_PARTIAL_START: &str = "tests/test-data/moss_noise_500-999b.raw"; // 3 events, first event is partial ~3.5 events, also ends with a partial event
+const THREE_EVENTS_PARTIAL_START_PACKETS: usize = 3;
+const THREE_EVENTS_PARTIAL_START_HITS: usize = 77;
+const THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX: usize = 379;
+
+// Utility to compare all packets in two vectors (for comparing result of different decoding methods)
+fn compare_all_packets(a_packets: &[MossPacket], b_packets: &[MossPacket]) {
+    assert_eq!(a_packets.len(), b_packets.len());
+
+    for (i, a_packet) in a_packets.iter().enumerate() {
+        let b_packet = &b_packets[i];
+        assert_eq!(a_packet.unit_id, b_packet.unit_id);
+        assert_eq!(a_packet.hits.len(), b_packet.hits.len());
+        for (j, a_hit) in a_packet.hits.iter().enumerate() {
+            let b_hit = &b_packet.hits[j];
+
+            assert_eq!(a_hit.region, b_hit.region);
+            assert_eq!(a_hit.row, b_hit.row);
+            assert_eq!(a_hit.column, b_hit.column);
+        }
+    }
+}
+
+// Compare the result of all decoding methods that can decode all packets from a file/byte array
+fn compare_all_decoding_methods(
+    test_file: &str,
+    expect_packets: usize,
+    expect_hits: usize,
+    expect_trailer_idx: usize,
+) {
+    let bytes = std::fs::read(std::path::PathBuf::from(test_file)).unwrap();
+
+    // Do an initial comparison with the simple naive decoder and the expected values
+    let (debug_packets, debug_last_trailer_idx, invalid_words) =
+        moss_decoder::debug_decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, expect_trailer_idx, "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx}, expected: {expect_trailer_idx}. From trailer index to end of bytes: {remainder:#X?}", remainder = bytes.get(debug_last_trailer_idx..).unwrap());
+    assert_eq!(
+        debug_packets.len(),
+        expect_packets,
+        "Unexpected number of packets, got {packets}, expected {expect_packets}",
+        packets = debug_packets.len()
+    );
+    assert_eq!(
+        debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
+        expect_hits
+    );
+    assert_eq!(invalid_words.len(), 0);
+
+    // Then use that result to compare with the other decoding methods
+
+    // Check moss_decoder::debug_decode_all_events_from_file
+    let (debug_packets_from_file, debug_last_trailer_idx_from_file, invalid_words_from_file) =
+        moss_decoder::debug_decode_all_events_from_file(test_file.into()).unwrap();
+    assert_eq!(
+        debug_last_trailer_idx_from_file, debug_last_trailer_idx,
+        "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx_from_file}, expected: {debug_last_trailer_idx}. From trailer index to end of bytes: {remainder:#X?}",
+        remainder = bytes.get(debug_last_trailer_idx_from_file..).unwrap()
+    );
+    compare_all_packets(&debug_packets, &debug_packets_from_file);
+    assert_eq!(invalid_words_from_file.len(), 0);
+
+    // Check moss_decoder::decode_all_events
+    let (decode_all_events_packets, decode_all_events_last_trailer_idx) =
+        moss_decoder::decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, decode_all_events_last_trailer_idx);
+    compare_all_packets(&debug_packets, &decode_all_events_packets);
+
+    // Check moss_decoder::decode_from_file
+    let packets = moss_decoder::decode_from_file(test_file.into()).unwrap();
+    compare_all_packets(&packets, &decode_all_events_packets);
+
+    // Check moss_decoder::skip_n_take_all
+    let (packets, remainder) = moss_decoder::skip_n_take_all(&bytes, 0).unwrap();
+    let packets = packets.unwrap();
+    assert!(remainder.is_none());
+    compare_all_packets(&packets, &decode_all_events_packets);
+
+    // Check moss_decoder::decode_n_events
+    let (packets, last_trailer_idx) =
+        moss_decoder::decode_n_events(&bytes, expect_packets, None, None).unwrap();
+    assert_eq!(last_trailer_idx, debug_last_trailer_idx);
+    compare_all_packets(&packets, &decode_all_events_packets);
+}
 
 #[test]
 fn test_decoding_single_event() {
-    //
     let event = fake_event_simple();
 
     let (packet, last_trailer_idx) = decode_event(&event).unwrap();
@@ -173,22 +274,19 @@ fn test_decode_from_file() {
 
 #[test]
 fn test_decode_from_file_noise_all_region() {
-    let expect_packets = 1000;
-    let expect_hits = 6085;
-
     let packets =
         moss_decoder::decode_from_file(FILE_MOSS_NOISE_ALL_REGION.to_string().into()).unwrap();
     assert_eq!(
         packets.len(),
-        expect_packets,
-        "Expected {expect_packets} packets, got {}",
+        NOISE_ALL_REGION_PACKETS,
+        "Expected {NOISE_ALL_REGION_PACKETS} packets, got {}",
         packets.len()
     );
     // Count total hits
     let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
     assert_eq!(
-        total_hits, expect_hits,
-        "Expected {expect_hits} hits, got {total_hits}",
+        total_hits, NOISE_ALL_REGION_HITS,
+        "Expected {NOISE_ALL_REGION_HITS} hits, got {total_hits}",
     );
 }
 
@@ -576,4 +674,195 @@ fn test_decode_split_events_from_file_spillover() {
     let p2 = std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START);
     let res = decode_n_events_from_file(p2.clone(), take, None, remainder);
     assert_eq!(res.unwrap().len(), 2);
+}
+
+#[test]
+fn test_debug_decode_noise_all_region() {
+    pyo3::prepare_freethreaded_python();
+
+    let time = std::time::Instant::now();
+
+    let bytes = std::fs::read(std::path::PathBuf::from(FILE_MOSS_NOISE_ALL_REGION)).unwrap();
+
+    let res = moss_decoder::debug_decode_all_events(&bytes);
+
+    println!("Decoded in: {t:?}\n", t = time.elapsed());
+
+    let (packets, last_trailer_idx, invalid_words) = res.unwrap();
+
+    println!("Got: {packets} packets", packets = packets.len());
+    println!(
+        "Last trailer at index: {last_trailer_idx}/{}",
+        bytes.len() - 1
+    );
+    println!(
+        "Got: {invalid_words} invalid words",
+        invalid_words = invalid_words.len()
+    );
+
+    assert_eq!(packets.len(), NOISE_ALL_REGION_PACKETS);
+    assert_eq!(
+        last_trailer_idx,
+        bytes.len() - 2,
+        "Last 10 bytes of file: {:X?}",
+        bytes.get(bytes.len() - 10..)
+    );
+    assert_eq!(invalid_words.len(), 0);
+
+    // Count total hits
+    let total_hits = packets.iter().fold(0, |acc, p| acc + p.hits.len());
+    assert_eq!(
+        total_hits, NOISE_ALL_REGION_HITS,
+        "Expected {NOISE_ALL_REGION_HITS} hits, got {total_hits}",
+    );
+}
+
+#[test]
+fn test_compare_result_noise_all_region() {
+    pyo3::prepare_freethreaded_python();
+    compare_all_decoding_methods(
+        FILE_MOSS_NOISE_ALL_REGION,
+        NOISE_ALL_REGION_PACKETS,
+        NOISE_ALL_REGION_HITS,
+        NOISE_ALL_REGION_LAST_TRAILER_IDX,
+    );
+}
+
+#[test]
+fn test_compare_result_noise_random_region() {
+    pyo3::prepare_freethreaded_python();
+    compare_all_decoding_methods(
+        FILE_NOISE_RANDOM_REGION,
+        NOISE_RANDOM_REGION_PACKETS,
+        NOISE_RANDOM_REGION_HITS,
+        NOISE_RANDOM_REGION_LAST_TRAILER_IDX,
+    );
+}
+
+#[test]
+fn test_compare_result_pattern_all_regions() {
+    pyo3::prepare_freethreaded_python();
+    compare_all_decoding_methods(
+        FILE_PATTERN_ALL_REGIONS,
+        PATTERN_ALL_REGIONS_PACKETS,
+        PATTERN_ALL_REGIONS_HITS,
+        PATTERN_ALL_REGIONS_LAST_TRAILER_IDX,
+    );
+}
+
+#[test]
+fn test_compare_result_moss_noise() {
+    pyo3::prepare_freethreaded_python();
+    compare_all_decoding_methods(
+        FILE_MOSS_NOISE,
+        MOSS_NOISE_PACKETS,
+        MOSS_NOISE_HITS,
+        MOSS_NOISE_LAST_TRAILER_IDX,
+    );
+}
+
+#[test]
+fn test_compare_result_4_events_partial_end() {
+    pyo3::prepare_freethreaded_python();
+    let bytes = std::fs::read(std::path::PathBuf::from(FILE_4_EVENTS_PARTIAL_END)).unwrap();
+
+    // Do an initial comparison with the simple naive decoder and the expected values
+    let (debug_packets, debug_last_trailer_idx, invalid_words) =
+        moss_decoder::debug_decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX, "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx}, expected: {FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX}. From trailer index to end of bytes: {remainder:#X?}", remainder = bytes.get(debug_last_trailer_idx..).unwrap());
+    assert_eq!(
+        debug_packets.len(),
+        FOUR_EVENTS_PARTIAL_END_PACKETS,
+        "Unexpected number of packets, got {packets}, expected {FOUR_EVENTS_PARTIAL_END_PACKETS}",
+        packets = debug_packets.len()
+    );
+    assert_eq!(
+        debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
+        FOUR_EVENTS_PARTIAL_END_HITS
+    );
+    assert_eq!(invalid_words.len(), 0);
+
+    // Then use that result to compare with the other decoding methods
+
+    // Check moss_decoder::decode_all_events
+    match moss_decoder::decode_all_events(&bytes) {
+        Ok((decode_all_events_packets, decode_all_events_last_trailer_idx)) => panic!("This should have failed, got {decode_all_events_packets:?} packets, last trailer index: {decode_all_events_last_trailer_idx}"),
+        Err(e) => {println!("Got error: {e}"); assert!(e.to_string().contains("Failed decoding packet #5"))},
+    }
+
+    // Check moss_decoder::decode_from_file
+    let packets = moss_decoder::decode_from_file(FILE_4_EVENTS_PARTIAL_END.into()).unwrap();
+    compare_all_packets(&packets, &debug_packets);
+
+    // Check moss_decoder::skip_n_take_all
+    let (packets, remainder) = moss_decoder::skip_n_take_all(&bytes, 0).unwrap();
+    let packets = packets.unwrap();
+    assert!(remainder.is_some());
+    assert!(
+        remainder.unwrap().len() == bytes.len() - (FOUR_EVENTS_PARTIAL_END_LAST_TRAILER_IDX + 1)
+    );
+    compare_all_packets(&packets, &debug_packets);
+
+    // Check moss_decoder::decode_n_events
+    let (packets, last_trailer_idx) =
+        moss_decoder::decode_n_events(&bytes, FOUR_EVENTS_PARTIAL_END_PACKETS, None, None).unwrap();
+    assert_eq!(last_trailer_idx, debug_last_trailer_idx);
+    compare_all_packets(&packets, &debug_packets);
+}
+
+#[test]
+fn test_compare_result_3_events_partial_start() {
+    pyo3::prepare_freethreaded_python();
+    let bytes = std::fs::read(std::path::PathBuf::from(FILE_3_EVENTS_PARTIAL_START)).unwrap();
+
+    // Do an initial comparison with the simple naive decoder and the expected values
+    let (debug_packets, debug_last_trailer_idx, invalid_words) =
+        moss_decoder::debug_decode_all_events(&bytes).unwrap();
+    assert_eq!(debug_last_trailer_idx, THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX, "Unexpected last trailer index, got trailer index: {debug_last_trailer_idx}, expected: {THREE_EVENTS_PARTIAL_START_LAST_TRAILER_IDX}. From trailer index to end of bytes: {remainder:#X?}", remainder = bytes.get(debug_last_trailer_idx..).unwrap());
+    assert_eq!(
+        debug_packets.len(),
+        THREE_EVENTS_PARTIAL_START_PACKETS,
+        "Unexpected number of packets, got {packets}, expected {THREE_EVENTS_PARTIAL_START_PACKETS}",
+        packets = debug_packets.len()
+    );
+    assert_eq!(
+        debug_packets.iter().fold(0, |acc, p| acc + p.hits.len()),
+        THREE_EVENTS_PARTIAL_START_HITS
+    );
+    assert_eq!(invalid_words.len(), 108);
+
+    // Then use that result to compare with the other decoding methods
+
+    // Check moss_decoder::decode_all_events
+    match moss_decoder::decode_all_events(&bytes) {
+        Ok((decode_all_events_packets, decode_all_events_last_trailer_idx)) => panic!("This should have failed, got {decode_all_events_packets:?} packets, last trailer index: {decode_all_events_last_trailer_idx}"),
+        Err(e) => {println!("Got error: {e}"); assert!(e.to_string().contains("Failed decoding packet #1"))},
+    }
+
+    // Check moss_decoder::decode_from_file
+    match moss_decoder::decode_from_file(FILE_3_EVENTS_PARTIAL_START.into()) {
+        Ok(packets) => panic!("This should have failed, got {packets:?} packets"),
+        Err(e) => {
+            println!("Got error: {e}");
+            assert!(e.to_string().contains("Failed decoding packet #1"))
+        }
+    }
+
+    // Check moss_decoder::skip_n_take_all
+    match moss_decoder::skip_n_take_all(&bytes, 0) {
+        Ok(packets) => panic!("This should have failed, got {packets:?} packets"),
+        Err(e) => {
+            println!("Got error: {e}");
+            assert!(e.to_string().contains("Failed decoding packet #1"))
+        }
+    }
+
+    // Check moss_decoder::decode_n_events
+    match moss_decoder::decode_n_events(&bytes, THREE_EVENTS_PARTIAL_START_PACKETS, None, None) {
+        Ok(packets) => panic!("This should have failed, got {packets:?} packets"),
+        Err(e) => {
+            println!("Got error: {e}");
+            assert!(e.to_string().contains("Failed decoding packet #1"))
+        }
+    }
 }
