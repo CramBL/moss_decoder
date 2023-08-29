@@ -10,6 +10,9 @@ from moss_decoder import decode_event
 
 FILE_MOSS_NOISE = Path("tests/test-data/moss_noise.raw")
 FILE_MOSS_NOISE_ALL_REGION = Path("tests/test-data/noise_all_regions.raw")
+NOISE_ALL_REGION_PACKETS: int = 1000
+NOISE_ALL_REGION_HITS: int = 6085
+NOISE_ALL_REGION_LAST_TRAILER_IDX: int = 26542
 FILE_NOISE_RANDOM_REGION = Path("tests/test-data/noise_random_region.raw")
 FILE_PATTERN_ALL_REGIONS = Path("tests/test-data/pattern_all_regions.raw")
 FILE_4_EVENTS_PARTIAL_END = Path("tests/test-data/moss_noise_0-499b.raw")
@@ -314,6 +317,51 @@ def test_fundamental_class_comparisons():
     print("==> MossPacket is OK\n\n")
 
 
+def test_debug_decode_events(
+    test_file: Path, expect_trailer_idx: int, expect_packets: int, expect_hits: int
+):
+    print(f"=== Testing debug_decode_events with file: {test_file} ===")
+    print(
+        f"Expecting last trailer index={expect_trailer_idx}, packets={expect_packets}, hits={expect_hits}"
+    )
+    # First decode from file and from in memory bytes and check that they match
+    (
+        packets_from_file,
+        last_trailer_idx_from_file,
+        invalid_words_from_file,
+    ) = moss_decoder.debug_decode_all_events_from_file(test_file)
+
+    test_data = read_bytes_from_file(file_path=test_file)
+    (
+        packets,
+        last_trailer_idx,
+        invalid_words,
+    ) = moss_decoder.debug_decode_all_events(test_data)
+
+    assert (
+        last_trailer_idx_from_file == last_trailer_idx
+    ), f"Mismatch in last trailer index decoding from file vs. memory: {last_trailer_idx_from_file} != {last_trailer_idx})"
+    assert len(packets_from_file) == len(
+        packets
+    ), f"Mismatch in packet count decoding from file vs. memory: {len(packets_from_file)} != {len(packets)})"
+    total_hits = sum(len(p.hits) for p in packets)
+    total_hits_from_file = sum(len(p.hits) for p in packets_from_file)
+    assert (
+        total_hits_from_file == total_hits
+    ), f"Mismatch in total hits decoding from file vs. memory: {total_hits_from_file} != {total_hits})"
+
+    # Then check vs. the expected count
+    assert (
+        last_trailer_idx == expect_trailer_idx
+    ), f"Expected last trailer at index={expect_trailer_idx}, got: {last_trailer_idx}"
+    assert (
+        len(packets) == expect_packets
+    ), f"Got {len(packets)}, expected {expect_packets}"
+
+    assert total_hits == expect_hits, f"expected {expect_hits}, got {total_hits}"
+    print("==> Test OK\n\n")
+
+
 if __name__ == "__main__":
     args = sys.argv
 
@@ -364,6 +412,9 @@ if __name__ == "__main__":
 
     test_decode_1GB_file(file_path=FILE_MOSS_NOISE, expect_packets=100000)
 
-    start = time.time()
-    test_100k_single_decodes()
-    print(f"Done in: {time.time()-start:.3f} s\n")
+    test_debug_decode_events(
+        test_file=FILE_MOSS_NOISE_ALL_REGION,
+        expect_trailer_idx=NOISE_ALL_REGION_LAST_TRAILER_IDX,
+        expect_packets=NOISE_ALL_REGION_PACKETS,
+        expect_hits=NOISE_ALL_REGION_HITS,
+    )
