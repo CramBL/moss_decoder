@@ -2,11 +2,13 @@
 name = "moss_decoder"
 version = "1.0.0"
 edition = "2021"
-authors = ["Marc Beck König <mbkj@tutamail.com>"]
+authors = [
+    "Marc Beck König <mbkj@tutamail.com>",
+    "Miljenko Suljic <miljenko.suljic@cern.ch>",
+]
 license = "MIT OR Apache-2.0"
 description = "Python module providing a decoder for the MOSS chip protocol."
 categories = ["python-module"]
-
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
