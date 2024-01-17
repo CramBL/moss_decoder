@@ -180,7 +180,10 @@ pub(crate) fn extract_hits<'a>(
                     add_data0(&mut hits, b, current_region);
                     st.transition(_Data).as_enum()
                 }
-                MossWord::IDLE => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_NO_BACKBONE => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_FOUR_BIT => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_TWO_BIT => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_ONE_BIT => st.transition(_Idle).as_enum(),
                 REGION_HEADER1 => {
                     current_region = 1;
                     st.transition(_RegionHeader1).as_enum()
@@ -222,7 +225,10 @@ pub(crate) fn extract_hits<'a>(
                     current_region = 3;
                     st.transition(_RegionHeader3).as_enum()
                 }
-                MossWord::IDLE => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_NO_BACKBONE => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_FOUR_BIT => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_TWO_BIT => st.transition(_Idle).as_enum(),
+                MossWord::IDLE_ONE_BIT => st.transition(_Idle).as_enum(),
                 MossWord::UNIT_FRAME_TRAILER => {
                     is_trailer_seen = true;
                     break;

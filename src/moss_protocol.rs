@@ -22,7 +22,10 @@ pub(crate) enum MossWord {
 }
 
 impl MossWord {
-    pub(super) const IDLE: u8 = 0xFF; // 1111_1111 (default)
+    pub(super) const IDLE_NO_BACKBONE: u8 = 0xFF; // 1111_1111 (default), used in long edge readout
+    pub(super) const IDLE_FOUR_BIT: u8 = 0xF0; // 1111_0000, LEC readout 4-bit DMU mode
+    pub(super) const IDLE_TWO_BIT: u8 = 0xFC; // 1111_1100, LEC readout 2-bit DMU mode
+    pub(super) const IDLE_ONE_BIT: u8 = 0xFE; // 1111_1110, LEC readout 1-bit DMU mode
                                       // pub(super) const UNIT_FRAME_HEADER_LOWEST_ID: u8 = 0b1101_0001; // 1101_<unit_id[3:0]>
     pub(super) const UNIT_FRAME_TRAILER: u8 = 0b1110_0000; // 1110_0000
     pub(super) const REGION_HEADER: u8 = 0b1100_0000; // 1100_00_<region_id[1:0]>
@@ -38,7 +41,10 @@ impl MossWord {
     pub fn from_byte(b: u8) -> MossWord {
         match b {
             // Exact matches
-            Self::IDLE => MossWord::Idle,
+            Self::IDLE_NO_BACKBONE => MossWord::Idle,
+            Self::IDLE_FOUR_BIT => MossWord::Idle,
+            Self::IDLE_TWO_BIT => MossWord::Idle,
+            Self::IDLE_ONE_BIT => MossWord::Idle,
             Self::UNIT_FRAME_TRAILER => MossWord::UnitFrameTrailer,
             six_msb if six_msb & 0xFC == Self::REGION_HEADER => MossWord::RegionHeader,
             four_msb if four_msb & 0xF0 == 0b1101_0000 => MossWord::UnitFrameHeader,
